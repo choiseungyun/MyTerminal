@@ -50,9 +50,9 @@
 - [x] 공개 전 점검: 현재 파일의 개인 정보(스크린샷에서 온 내부 IP·키 이름·파일 이름) 제거, 커밋 기록은 새 기록으로 공개하기로 결정
 - [x] 문서: README(가짜 데이터 화면 사진), LICENSE, THIRD_PARTY_NOTICES(앱 안에도 포함, 도움말 메뉴), CONTRIBUTING, SECURITY, CHANGELOG. 버전 0.1.0
 - [x] 배포 스크립트 `scripts/release.sh` (임시 서명 모드로 universal 빌드·Hardened Runtime·DMG·앱 실행 확인. 서명·공증은 인증서 필요)
-- [x] CI 워크플로 (macos-26, Xcode 26.6): 첫 실행에서 엔진 빌드·앱 빌드 성공, 테스트 12건 실패 → 러너 화면(1024×768)에 맞게 배치 테스트를 비율로, bash 3.2 셸에서는 셸 통합 테스트 건너뜀
+- [x] CI 워크플로 (macos-26, Xcode 26.6): 첫 실행에서 엔진 빌드·앱 빌드 성공, 테스트 12건 실패 → 러너 화면(1024×768)에 맞게 배치 테스트를 비율로, bash 3.2 셸에서는 셸 통합 테스트 건너뜀 → **두 번째 실행 성공** (README 배지)
 - [x] 공개 저장소: 비공개 저장소를 `MyTerminal-dev` 로 이름 바꿔 전체 기록 보관, 새 공개 저장소 `MyTerminal` 에 새 기록(커밋 1개, noreply). 취약점 비공개 신고 켬, 주제 태그
-- [ ] 첫 릴리스 v0.1.0: 초안 작성됨. Developer ID 인증서 준비 → `scripts/release.sh` → DMG 첨부 → 공개 (공증 자격 증명은 저장됨)
+- [ ] 첫 릴리스 v0.1.0: 초안 작성됨, 공증 자격 증명 저장됨, **Developer ID 인증서 설치됨** (계정 소유자 발급, CSR 방식) → `scripts/release.sh` → DMG 첨부 → 공개
 
 ## 지난 단계: M5 AI 도우미
 

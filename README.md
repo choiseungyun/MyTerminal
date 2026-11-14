@@ -1,5 +1,7 @@
 # MyTerminal
 
+[![CI](https://github.com/choiseungyun/MyTerminal/actions/workflows/ci.yml/badge.svg)](https://github.com/choiseungyun/MyTerminal/actions/workflows/ci.yml)
+
 **SSH 접속 관리와 SFTP, 화면 분할, AI 도우미를 갖춘 macOS 터미널.** 터미널 엔진은 [Ghostty](https://github.com/ghostty-org/ghostty)의 libghostty 를 쓰고, 그 위의 화면은 직접 설계했습니다.
 
 *A macOS terminal with SSH host management, SFTP, split panes and an AI assistant, built on libghostty. The UI and docs are in Korean.*
