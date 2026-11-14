@@ -1,7 +1,7 @@
 # 진행 현황
 
 - 마지막 갱신: 2026-11-13
-- 현재 단계: **v0.1.0 공개 완료** (M1~M6) · M5 실제 API 확인 보류 · M1~M4 확인 완료 · M5 실제 API 확인 보류
+- 현재 단계: **v0.1.0 공개 완료** (M1~M6, M1~M4 사용자 확인 완료) · M5 실제 API 확인은 결제 문제로 보류
 - 저장소: [choiseungyun/MyTerminal](https://github.com/choiseungyun/MyTerminal) (**공개**, 2026-11-14). 공개 전 전체 기록은 비공개 `MyTerminal-dev` 에 보관
 
 ## 한눈에 보기
