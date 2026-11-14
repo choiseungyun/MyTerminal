@@ -59,8 +59,10 @@ fi
 
 # --- 엔진: universal 이어야 한다 --------------------------------------------
 step "GhosttyKit 확인"
+# (pipefail 에서 `명령 | grep -q` 는 grep 이 먼저 끝나면 앞 명령이 SIGPIPE 로 실패해 잘못 판단하므로 변수에 담아 검사한다)
 LIB="$(find Frameworks/GhosttyKit.xcframework -name '*.a' 2>/dev/null | head -1 || true)"
-if [[ -z "$LIB" ]] || ! lipo -archs "$LIB" | grep -q x86_64 || ! lipo -archs "$LIB" | grep -q arm64; then
+ARCHS="$([[ -n "$LIB" ]] && lipo -archs "$LIB" || true)"
+if [[ "$ARCHS" != *x86_64* || "$ARCHS" != *arm64* ]]; then
   echo "universal 엔진이 없어 빌드합니다 (몇 분 걸립니다)"
   scripts/build-ghosttykit.sh release
 fi
@@ -82,10 +84,11 @@ APP="$OUT/MyTerminal.xcarchive/Products/Applications/MyTerminal.app"
 
 step "서명 확인"
 codesign --verify --deep --strict --verbose=2 "$APP"
-codesign -dv "$APP" 2>&1 | grep -E "Authority|TeamIdentifier|flags|Identifier=" || true
+SIGN_INFO="$(codesign -dv "$APP" 2>&1)"
+grep -E "Authority|TeamIdentifier|flags|Identifier=" <<<"$SIGN_INFO" || true
 lipo -archs "$APP/Contents/MacOS/MyTerminal"
-if [[ $ADHOC -eq 0 ]]; then
-  codesign -dv "$APP" 2>&1 | grep -q "runtime" || fail "Hardened Runtime 이 꺼져 있습니다 (공증 불가)"
+if [[ $ADHOC -eq 0 && "$SIGN_INFO" != *runtime* ]]; then
+  fail "Hardened Runtime 이 꺼져 있습니다 (공증 불가)"
 fi
 
 notarize() {
