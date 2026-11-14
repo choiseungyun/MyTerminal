@@ -1,0 +1,117 @@
+# XcodeGen 프로젝트 정의. MyTerminal.xcodeproj 는 이 파일에서 생성하며 git 에 올리지 않는다.
+# 생성: xcodegen generate
+name: MyTerminal
+
+options:
+  bundleIdPrefix: kr.weare
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  developmentLanguage: ko
+
+packages:
+  # SQLite 래퍼 (MIT). 호스트·작업·히스토리 저장
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: 7.12.0
+
+# 코드 서명: 공용 기본값 + 개인 설정(Config/Signing.local.xcconfig, git 제외)
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  MyTerminal:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+        excludes:
+          - "**/README.md"
+          - "**/.gitkeep"
+      - path: Resources
+        excludes:
+          - Info.plist
+      # scripts/copy-ghostty-resources.sh 로 생성. 번들의 Contents/Resources 아래에 폴더째 들어간다.
+      - path: Frameworks/GhosttyResources/terminfo
+        type: folder
+        buildPhase: resources
+      - path: Frameworks/GhosttyResources/ghostty
+        type: folder
+        buildPhase: resources
+      # 라이선스 고지 (도움말 > 오픈소스 라이선스)
+      - path: LICENSE
+        buildPhase: resources
+      - path: THIRD_PARTY_NOTICES.md
+        buildPhase: resources
+    dependencies:
+      # scripts/build-ghosttykit.sh 로 생성
+      - framework: Frameworks/GhosttyKit.xcframework
+        embed: false
+      - package: GRDB
+      - sdk: Carbon.framework
+      - sdk: Metal.framework
+      - sdk: MetalKit.framework
+      - sdk: QuartzCore.framework
+      - sdk: CoreText.framework
+      - sdk: IOSurface.framework
+      - sdk: UniformTypeIdentifiers.framework
+    info:
+      path: Resources/Info.plist
+      properties:
+        CFBundleDisplayName: MyTerminal
+        CFBundleName: MyTerminal
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSApplicationCategoryType: public.app-category.developer-tools
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        NSHumanReadableCopyright: "Copyright © 2026 MyTerminal contributors. MIT License. Powered by libghostty."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kr.weare.myterminal
+        PRODUCT_NAME: MyTerminal
+        # 앱 아이콘: Resources/Assets.xcassets/AppIcon (scripts/make-app-icon.swift 로 생성)
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        # libghostty 는 C++ 표준 라이브러리를 쓴다
+        OTHER_LDFLAGS: ["-lc++"]
+        # 터미널은 셸·ssh 를 실행하고 사용자 파일(~/.ssh 등)에 접근해야 하므로 샌드박스를 쓰지 않는다.
+        # → Mac App Store 배포 불가. 배포는 Developer ID + 공증(Direct Distribution) 으로 한다.
+        ENABLE_APP_SANDBOX: NO
+        # Hardened Runtime: 공증에 필요. 개발 빌드는 끈다 (임시 서명으로도 테스트 번들을 불러올 수 있게)
+        ENABLE_HARDENED_RUNTIME: NO
+        # 서명(팀·인증서)은 Config/Signing.xcconfig 에서
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        COMBINE_HIDPI_IMAGES: YES
+      configs:
+        Release:
+          ENABLE_HARDENED_RUNTIME: YES
+
+  MyTerminalTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/Unit
+    dependencies:
+      - target: MyTerminal
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: kr.weare.myterminal.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/MyTerminal.app/Contents/MacOS/MyTerminal
+        BUNDLE_LOADER: $(TEST_HOST)
+
+schemes:
+  MyTerminal:
+    build:
+      targets:
+        MyTerminal: all
+        MyTerminalTests: [test]
+    test:
+      targets:
+        - MyTerminalTests

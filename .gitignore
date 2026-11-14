@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# GhosttyKit build output (scripts/build-ghosttykit.sh)
+Frameworks/GhosttyKit.xcframework/
+Frameworks/GhosttyResources/
+
+# Secrets
+*.p12
+*.mobileprovision
+.env
+
+# XcodeGen 생성물 (project.yml 에서 생성)
+MyTerminal.xcodeproj/
+Resources/Info.plist
+
+# 개인 서명 설정 (팀 ID)
+Config/Signing.local.xcconfig

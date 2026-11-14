@@ -1,0 +1,6 @@
+// 개인 서명 설정 예시. Signing.local.xcconfig 로 복사해서 팀 ID 를 넣는다.
+// 팀 ID: Xcode > Settings > Accounts 또는 https://developer.apple.com/account (Membership)
+
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+CODE_SIGN_STYLE = Automatic
+CODE_SIGN_IDENTITY = Apple Development

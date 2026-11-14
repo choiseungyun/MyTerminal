@@ -1,0 +1,75 @@
+# 빌드와 단위 테스트.
+#
+# macOS 러너는 비공개 저장소에서 사용 시간이 10배로 계산되므로,
+# 비공개일 때는 수동 실행(Actions > CI > Run workflow)만 하고, 공개 저장소에서는 push·PR 마다 돈다.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    if: ${{ !github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.17.1
+
+      - name: 도구 준비
+        run: |
+          brew install xcodegen
+          xcodebuild -version
+          xcodebuild -downloadComponent MetalToolchain
+
+      - name: 엔진 캐시 키
+        id: engine
+        run: echo "key=ghosttykit-native-${{ runner.arch }}-$(git -C vendor/ghostty rev-parse HEAD)-${{ hashFiles('scripts/build-ghosttykit.sh', 'scripts/copy-ghostty-resources.sh') }}-xcode26.6" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v6
+        id: cache
+        with:
+          path: |
+            Frameworks/GhosttyKit.xcframework
+            Frameworks/GhosttyResources
+          key: ${{ steps.engine.outputs.key }}
+
+      # CI 는 테스트만 하므로 이 러너 아키텍처만 빌드한다 (배포용 universal 은 scripts/release.sh)
+      - name: 엔진 빌드 (GhosttyKit)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: scripts/build-ghosttykit.sh release --native
+
+      - name: 프로젝트 생성
+        run: xcodegen generate
+
+      - name: 빌드·테스트
+        run: |
+          set -o pipefail
+          mkdir -p build
+          xcodebuild -project MyTerminal.xcodeproj -scheme MyTerminal \
+            -destination 'platform=macOS' -derivedDataPath build/ci \
+            test 2>&1 | tee build/ci-test.log | grep -E "error:|warning: |Test Case .* failed|Executed [0-9]+ tests|TEST (SUCCEEDED|FAILED)"
+
+      - name: 테스트 기록 올리기 (실패 시)
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-log
+          path: build/ci-test.log
