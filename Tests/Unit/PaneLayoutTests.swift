@@ -8,6 +8,12 @@ import XCTest
 final class PaneLayoutTests: XCTestCase {
     private var window: NSWindow!
 
+    /// 테스트 창 크기. CI 러너 화면(1024×768)에서도 줄어들지 않도록 작게 잡고, 기대값은 이 크기의 비율로 쓴다.
+    private static let W: CGFloat = 960
+    private static let H: CGFloat = 560
+    private var W: CGFloat { Self.W }
+    private var H: CGFloat { Self.H }
+
     override func tearDown() {
         window?.orderOut(nil)
         window = nil
@@ -16,7 +22,7 @@ final class PaneLayoutTests: XCTestCase {
 
     private func show(_ tab: TerminalTab, store: WorkspaceStore = .forTesting()) {
         window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
+            contentRect: NSRect(x: 0, y: 0, width: Self.W, height: Self.H),
             styleMask: [.titled, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: TerminalTabView(tab: tab).environmentObject(store))
@@ -50,7 +56,7 @@ final class PaneLayoutTests: XCTestCase {
         show(tab)
 
         let rightTop = frameInWindow(b)
-        XCTAssertGreaterThan(rightTop.minX, 500)
+        XCTAssertGreaterThan(rightTop.minX, W * 0.42)
 
         // WorkspaceStore.closePane 과 같은 순서
         tab.root = tab.root.removing(c.id)!
@@ -61,9 +67,9 @@ final class PaneLayoutTests: XCTestCase {
         let right = frameInWindow(b)
         XCTAssertNil(c.view.window, "닫은 화면이 창에 남아 있음")
         XCTAssertEqual(left.minX, 0, accuracy: 1)
-        XCTAssertGreaterThan(right.minX, 500, "오른쪽 화면 위치가 이상함: \(right)")
-        XCTAssertGreaterThan(right.height, 700, "오른쪽 화면이 세로를 다 채우지 못함: \(right)")
-        XCTAssertGreaterThan(right.width, 500, "오른쪽 화면 너비가 이상함: \(right)")
+        XCTAssertGreaterThan(right.minX, W * 0.42, "오른쪽 화면 위치가 이상함: \(right)")
+        XCTAssertGreaterThan(right.height, H * 0.85, "오른쪽 화면이 세로를 다 채우지 못함: \(right)")
+        XCTAssertGreaterThan(right.width, W * 0.42, "오른쪽 화면 너비가 이상함: \(right)")
     }
 
     /// 닫은 뒤 남은 화면이 키 입력 포커스를 받고, 다시 분할·연속 닫기를 해도 화면이 창에 붙어 있다.
@@ -95,14 +101,14 @@ final class PaneLayoutTests: XCTestCase {
         settle()
         let right = frameInWindow(d)
         XCTAssertNil(b.view.window)
-        XCTAssertGreaterThan(right.height, 700, "오른쪽 화면이 세로를 다 채우지 못함: \(right)")
+        XCTAssertGreaterThan(right.height, H * 0.85, "오른쪽 화면이 세로를 다 채우지 못함: \(right)")
         XCTAssertTrue(window.firstResponder === d.view)
 
         // 마지막으로 왼쪽까지 닫으면 d 하나가 창 전체
         tab.root = tab.root.removing(a.id)!
         settle()
         let full = frameInWindow(d)
-        XCTAssertGreaterThan(full.width, 1100, "남은 화면이 창 전체를 채우지 못함: \(full)")
+        XCTAssertGreaterThan(full.width, W * 0.95, "남은 화면이 창 전체를 채우지 못함: \(full)")
     }
 
     /// 반대로 왼쪽을 닫으면 오른쪽 분할(위/아래)이 창 전체를 채운다.
@@ -124,8 +130,8 @@ final class PaneLayoutTests: XCTestCase {
         let bottom = frameInWindow(c)
         XCTAssertNil(a.view.window, "닫은 화면이 창에 남아 있음")
         XCTAssertEqual(top.minX, 0, accuracy: 1)
-        XCTAssertGreaterThan(top.width, 1100, "위 화면이 가로를 다 채우지 못함: \(top)")
-        XCTAssertGreaterThan(bottom.width, 1100, "아래 화면이 가로를 다 채우지 못함: \(bottom)")
+        XCTAssertGreaterThan(top.width, W * 0.95, "위 화면이 가로를 다 채우지 못함: \(top)")
+        XCTAssertGreaterThan(bottom.width, W * 0.95, "아래 화면이 가로를 다 채우지 못함: \(bottom)")
     }
 
     /// 파일 패널은 저장된 폭을 쓰고, 창의 75% 를 넘지 않는다.
@@ -140,15 +146,15 @@ final class PaneLayoutTests: XCTestCase {
         let tab = TerminalTab(pane: pane)
         tab.showsFilePanel = true
 
-        UserDefaults.standard.set(500.0, forKey: key)
+        UserDefaults.standard.set(400.0, forKey: key)
         show(tab)
-        // 창 1200 - 패널 500 - 경계 막대
+        // 창 폭 - 패널 400 - 경계 막대
         let handle = PanelResizeHandle.thickness
-        XCTAssertEqual(frameInWindow(pane).width, 1200 - 500 - handle, accuracy: 3)
+        XCTAssertEqual(frameInWindow(pane).width, W - 400 - handle, accuracy: 3)
 
         UserDefaults.standard.set(5000.0, forKey: key)
         settle()
-        XCTAssertEqual(frameInWindow(pane).width, 1200 * 0.25 - handle, accuracy: 3, "창의 75% 까지만")
+        XCTAssertEqual(frameInWindow(pane).width, W * 0.25 - handle, accuracy: 3, "창의 75% 까지만")
     }
 
     /// "연결하고 파일 보기" 는 파일 패널이 열린 탭을 만든다.
@@ -182,8 +188,8 @@ final class PaneLayoutTests: XCTestCase {
         XCTAssertTrue(store.mergeTab(source.id, into: original.id, edge: .left))
         settle()
 
-        XCTAssertLessThan(frameInWindow(moved).maxX, 650)
-        XCTAssertGreaterThan(frameInWindow(original).minX, 550)
+        XCTAssertLessThan(frameInWindow(moved).maxX, W * 0.54)
+        XCTAssertGreaterThan(frameInWindow(original).minX, W * 0.46)
     }
 
     /// ⌘D 로 생긴 선택 칸에서 대상을 고르면 그 자리에 터미널이 붙는다.
@@ -201,8 +207,8 @@ final class PaneLayoutTests: XCTestCase {
         store.resolvePicker(picker.id, with: .local)
         settle()
         let second = tab.panes[1]
-        XCTAssertLessThan(frameInWindow(first).maxX, 650)
-        XCTAssertGreaterThan(frameInWindow(second).minX, 550)
+        XCTAssertLessThan(frameInWindow(first).maxX, W * 0.54)
+        XCTAssertGreaterThan(frameInWindow(second).minX, W * 0.46)
     }
 
     /// 분할 화면 사이에는 SFTP 와 같은 두꺼운 경계 막대(좌우·위아래 모두)가 들어간다.
@@ -225,7 +231,7 @@ final class PaneLayoutTests: XCTestCase {
     /// 앱과 같이 제목 표시줄을 숨기고 자동 이동을 끈 창에 MainView 를 띄운다.
     private func showMain(_ store: WorkspaceStore) {
         window = NSWindow(
-            contentRect: NSRect(x: 200, y: 200, width: 1200, height: 800),
+            contentRect: NSRect(x: 40, y: 40, width: Self.W, height: Self.H),
             styleMask: [.titled, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -317,8 +323,8 @@ final class PaneLayoutTests: XCTestCase {
         XCTAssertNil(store.tabDrag)
         XCTAssertEqual(store.tabs.count, 1)
         XCTAssertEqual(target.panes.map(\.id), [sourcePane.id, targetPane.id])
-        XCTAssertLessThan(frameInWindow(sourcePane).maxX, 650)
-        XCTAssertGreaterThan(frameInWindow(targetPane).minX, 550)
+        XCTAssertLessThan(frameInWindow(sourcePane).maxX, W * 0.54)
+        XCTAssertGreaterThan(frameInWindow(targetPane).minX, W * 0.46)
         XCTAssertEqual(window.frame.origin, windowOrigin, "탭을 끄는 동안 창은 움직이지 않는다")
     }
 }

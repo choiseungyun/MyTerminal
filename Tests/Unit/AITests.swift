@@ -663,7 +663,12 @@ final class AIWorkspaceTests: XCTestCase {
 
     /// 셸 통합: 실패한 명령의 종료 코드와 현재 폴더가 들어온다 ("왜 실패했나요?" 버튼의 근거)
     @MainActor
-    func testShellIntegrationReportsFailedCommandAndDirectory() {
+    func testShellIntegrationReportsFailedCommandAndDirectory() throws {
+        // Ghostty 셸 통합은 zsh·fish·bash 4 이상만 지원한다. macOS 기본 bash(3.2)가 로그인 셸이면(CI 러너 등) 건너뛴다.
+        let loginShell = getpwuid(getuid()).map { String(cString: $0.pointee.pw_shell) } ?? ""
+        guard ["zsh", "fish"].contains((loginShell as NSString).lastPathComponent) else {
+            throw XCTSkip("셸 통합을 지원하지 않는 로그인 셸: \(loginShell)")
+        }
         let store = WorkspaceStore.forTesting()
         store.openLocalTerminal()
         let tab = store.currentTab!
