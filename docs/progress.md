@@ -1,7 +1,7 @@
 # 진행 현황
 
 - 마지막 갱신: 2026-11-13
-- 현재 단계: **M6 공개 준비** (저장소 공개 완료, 첫 릴리스 DMG 만 남음) · M1~M4 확인 완료 · M5 실제 API 확인 보류
+- 현재 단계: **v0.1.0 공개 완료** (M1~M6) · M5 실제 API 확인 보류 · M1~M4 확인 완료 · M5 실제 API 확인 보류
 - 저장소: [choiseungyun/MyTerminal](https://github.com/choiseungyun/MyTerminal) (**공개**, 2026-11-14). 공개 전 전체 기록은 비공개 `MyTerminal-dev` 에 보관
 
 ## 한눈에 보기
@@ -14,7 +14,7 @@
 | M3 | 접속 이력 (히스토리) | ✅ 완료 | `██████████` 1/1 |
 | M4 | SFTP | ✅ 완료 | `██████████` 6/6 |
 | M5 | AI 도우미 | ✅ 구현 완료 (실제 API 확인 보류) | `██████████` 5/5 |
-| M6 | 공개 준비 (v0.1) | 🟡 진행 중 | `█████████░` 5/6 |
+| M6 | 공개 준비 (v0.1) | ✅ 완료 | `██████████` 6/6 |
 
 일정과 완료 기준은 [plan/03-roadmap.md](plan/03-roadmap.md)에 있습니다.
 
@@ -43,7 +43,7 @@
 - [x] 검색·정렬, 그룹별 묶음 (2026-11-13 확인)
 - [x] ssh config 가져오기 (이 Mac 에는 `~/.ssh/config` 가 없어 "파일 없음" 안내 확인)
 
-## 현재 단계: M6 공개 준비 (v0.1)
+## 지난 단계: M6 공개 준비 (v0.1) — 완료
 
 설계: [plan/04-open-source.md](plan/04-open-source.md) · 완료 기준: GitHub Release 로 누구나 설치 가능
 
@@ -52,7 +52,7 @@
 - [x] 배포 스크립트 `scripts/release.sh` (임시 서명 모드로 universal 빌드·Hardened Runtime·DMG·앱 실행 확인. 서명·공증은 인증서 필요)
 - [x] CI 워크플로 (macos-26, Xcode 26.6): 첫 실행에서 엔진 빌드·앱 빌드 성공, 테스트 12건 실패 → 러너 화면(1024×768)에 맞게 배치 테스트를 비율로, bash 3.2 셸에서는 셸 통합 테스트 건너뜀 → **두 번째 실행 성공** (README 배지)
 - [x] 공개 저장소: 비공개 저장소를 `MyTerminal-dev` 로 이름 바꿔 전체 기록 보관, 새 공개 저장소 `MyTerminal` 에 새 기록(커밋 1개, noreply). 취약점 비공개 신고 켬, 주제 태그
-- [ ] 첫 릴리스 v0.1.0: 초안 작성됨, 공증 자격 증명 저장됨, **Developer ID 인증서 설치됨** (계정 소유자 발급, CSR 방식) → `scripts/release.sh` → DMG 첨부 → 공개
+- [x] 첫 릴리스 [v0.1.0](https://github.com/choiseungyun/MyTerminal/releases/tag/v0.1.0) 공개 (2026-11-14): Developer ID 서명·Apple 공증·스테이플된 DMG(universal, 21MB) + sha256. Gatekeeper `accepted (Notarized Developer ID)`, 로그인 없이 내려받은 파일 체크섬 일치 확인
 
 ## 지난 단계: M5 AI 도우미
 
@@ -226,6 +226,7 @@
 
 | 날짜 | 단계 | 내용 |
 | --- | --- | --- |
+| 2026-11-14 | M6 | **v0.1.0 릴리스 공개**: Developer ID 인증서(계정 소유자가 CSR 로 발급, -25294 는 명령으로 로그인 키체인에 직접 넣어 해결), release.sh 버그 수정(pipefail 에서 `codesign \| grep -q` 가 SIGPIPE 로 실패 → Hardened Runtime 이 켜져 있는데 꺼져 있다고 판단), 서명·공증·스테이플된 universal DMG 를 릴리스에 첨부해 공개. Gatekeeper 통과·공개 내려받기 체크섬 일치 확인. **M6 완료** |
 | 2026-11-14 | M6 | **저장소 공개**: 비공개 저장소 → `MyTerminal-dev`(전체 기록 보관), 새 공개 저장소 `MyTerminal`(새 기록 1개, 작성자 noreply). 취약점 비공개 신고·주제 태그. 첫 CI: 엔진·앱 빌드 성공, 테스트 12건 실패(러너 화면 1024×768 로 테스트 창이 줄어듦 10건, 러너 셸 bash 3.2 는 셸 통합 미지원 2건) → 배치 테스트를 창 크기 비율로, bash 3.2 에서는 셸 통합 테스트 건너뜀. v0.1.0 초안 릴리스 작성, 공증 자격 증명 저장됨, Developer ID 인증서 대기 |
 | 2026-11-14 | M6 | 공개 준비: 개인 정보 점검(현재 파일 정리, 기록은 새 기록으로 공개 결정), README·LICENSE·THIRD_PARTY_NOTICES·CONTRIBUTING·SECURITY·CHANGELOG, 앱에 라이선스 고지 포함·도움말 메뉴, 버전 0.1.0(Info.plist 가 프로젝트 버전을 따르도록), `scripts/release.sh`(임시 서명 모드로 universal·Hardened Runtime·DMG 21MB·앱 실행 확인), CI 워크플로(비공개 땐 수동 실행) |
 | 2026-11-14 | 확인 | 사용자 확인 완료: 다른 서버와 분할 9개 항목 (대상 고르기, 탭 끌어 합치기·분리, 창 이동 분리, 자동 전환·안내, 서버별 색, 두꺼운 막대). M5 AI 실제 API 확인은 결제가 필요해 사용자 결정으로 보류 (요청·응답 처리는 네트워크 대역 테스트로 확인됨) |
@@ -290,7 +291,7 @@
 
 ## 다음 할 일
 
-1. M6 공개 준비 (README, CI, 서명·공증, DMG) 또는 AI 2차 후보
+1. v0.1.0 이후 계획 정하기 (AI 웹 패널, Sparkle 자동 업데이트, Homebrew Cask, M5 실제 API 확인 등) 공개 준비 (README, CI, 서명·공증, DMG) 또는 AI 2차 후보
 
 ## 이 문서의 관리 방법
 
