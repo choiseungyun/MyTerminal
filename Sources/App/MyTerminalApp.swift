@@ -12,6 +12,7 @@ struct MyTerminalApp: App {
         TerminalSettings.shared.writeConfigFile()
         RemoteEditor.cleanUpPreviousSession()
         _ = GhosttyRuntime.shared
+        _ = AppUpdater.shared   // 배포용 빌드에서 자동 업데이트 시작
     }
 
     /// 앱에 들어 있는 문서를 기본 앱(텍스트 편집기 등)으로 연다
@@ -33,6 +34,10 @@ struct MyTerminalApp: App {
         .defaultSize(width: 1200, height: 760)
         .commands {
             // 설정 메뉴(⌘,)는 아래 Settings 장면이 자동으로 만든다.
+            CommandGroup(after: .appInfo) {
+                CheckForUpdatesButton()
+            }
+
             CommandGroup(replacing: .newItem) {
                 Button("새 로컬 터미널") { store.openLocalTerminal() }
                     .keyboardShortcut("t")
@@ -98,6 +103,16 @@ struct MyTerminalApp: App {
             SettingsView()
                 .preferredColorScheme(.dark)
         }
+    }
+}
+
+/// 앱 메뉴 "업데이트 확인…"
+private struct CheckForUpdatesButton: View {
+    @ObservedObject private var updater = AppUpdater.shared
+
+    var body: some View {
+        Button("업데이트 확인…") { updater.checkForUpdates() }
+            .disabled(!updater.canCheckForUpdates)
     }
 }
 

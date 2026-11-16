@@ -13,8 +13,16 @@
 #        xcrun notarytool store-credentials myterminal-notary \
 #          --apple-id <Apple ID> --team-id <팀 ID> --password <앱 암호>
 #      프로필 이름은 NOTARY_PROFILE 환경 변수로 바꿀 수 있다.
+#   4. 자동 업데이트(Sparkle) 서명 키: 비밀 키는 키체인(계정 이름 myterminal), 공개 키는 project.yml 의 SUPublicEDKey
+#        <DerivedData>/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys --account myterminal
+#      키를 잃으면 기존 사용자에게 업데이트를 보낼 수 없다. 백업: generate_keys --account myterminal -x <파일>
+#      (비밀 키 파일은 저장소에 올리지 않는다)
 #
-# 결과: build/release/MyTerminal-<버전>.dmg, .sha256
+# 결과: build/release/MyTerminal-<버전>.dmg, .sha256, appcast.xml (릴리스에 함께 올린다)
+#
+# 시험용 환경 변수 (평소에는 쓰지 않는다):
+#   MYTERM_VERSION / MYTERM_BUILD : project.yml 대신 이 버전·빌드 번호로 만든다 (업데이트 시험용)
+#   DOWNLOAD_URL_PREFIX           : appcast.xml 의 내려받기 주소 앞부분 (기본: GitHub 릴리스)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,9 +44,13 @@ cd "$ROOT"
 step() { printf '\n==> %s\n' "$1"; }
 fail() { echo "오류: $1" >&2; exit 1; }
 
-VERSION="$(sed -nE 's/^ *MARKETING_VERSION: *"?([^"]+)"?/\1/p' project.yml | head -1)"
-[[ -n "$VERSION" ]] || fail "project.yml 에서 MARKETING_VERSION 을 찾지 못했습니다"
-echo "MyTerminal $VERSION"
+VERSION="${MYTERM_VERSION:-$(sed -nE 's/^ *MARKETING_VERSION: *"?([^"]+)"?/\1/p' project.yml | head -1)}"
+BUILD="${MYTERM_BUILD:-$(sed -nE 's/^ *CURRENT_PROJECT_VERSION: *"?([^"]+)"?/\1/p' project.yml | head -1)}"
+[[ -n "$VERSION" && -n "$BUILD" ]] || fail "project.yml 에서 MARKETING_VERSION·CURRENT_PROJECT_VERSION 을 찾지 못했습니다"
+REPO="choiseungyun/MyTerminal"
+DOWNLOAD_URL_PREFIX="${DOWNLOAD_URL_PREFIX:-https://github.com/$REPO/releases/download/v$VERSION/}"
+SPARKLE_ACCOUNT="myterminal"
+echo "MyTerminal $VERSION ($BUILD)"
 
 # --- 서명 설정 -------------------------------------------------------------
 if [[ $ADHOC -eq 1 ]]; then
@@ -77,10 +89,26 @@ xcodebuild -project MyTerminal.xcodeproj -scheme MyTerminal -configuration Relea
   -destination 'generic/platform=macOS' -derivedDataPath "$OUT/DerivedData" \
   -archivePath "$OUT/MyTerminal.xcarchive" \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$IDENTITY" DEVELOPMENT_TEAM="$TEAM" \
+  MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
   OTHER_CODE_SIGN_FLAGS="--timestamp" \
   archive | grep -E "error:|warning: .*sign|ARCHIVE (SUCCEEDED|FAILED)" || true
 APP="$OUT/MyTerminal.xcarchive/Products/Applications/MyTerminal.app"
 [[ -d "$APP" ]] || fail "빌드 실패 (위 오류 확인)"
+
+# Sparkle 의 도우미 프로그램(Autoupdate, Updater.app, XPC 서비스)은 임시 서명으로 들어와서
+# 그대로 두면 공증이 거절된다. 안쪽부터 Developer ID 로 다시 서명하고, 마지막에 앱을 다시 서명한다. (Sparkle 문서의 절차)
+if [[ $ADHOC -eq 0 ]]; then
+  step "Sparkle 다시 서명"
+  SPARKLE_FW="$APP/Contents/Frameworks/Sparkle.framework"
+  [[ -d "$SPARKLE_FW" ]] || fail "Sparkle.framework 가 앱에 없습니다"
+  sign() { codesign --force --sign "$IDENTITY" --options runtime --timestamp "$@"; }
+  sign "$SPARKLE_FW/Versions/B/XPCServices/Installer.xpc"
+  sign --preserve-metadata=entitlements "$SPARKLE_FW/Versions/B/XPCServices/Downloader.xpc"
+  sign "$SPARKLE_FW/Versions/B/Autoupdate"
+  sign "$SPARKLE_FW/Versions/B/Updater.app"
+  sign "$SPARKLE_FW"
+  sign --preserve-metadata=entitlements,requirements,flags "$APP"
+fi
 
 step "서명 확인"
 codesign --verify --deep --strict --verbose=2 "$APP"
@@ -89,6 +117,14 @@ grep -E "Authority|TeamIdentifier|flags|Identifier=" <<<"$SIGN_INFO" || true
 lipo -archs "$APP/Contents/MacOS/MyTerminal"
 if [[ $ADHOC -eq 0 && "$SIGN_INFO" != *runtime* ]]; then
   fail "Hardened Runtime 이 꺼져 있습니다 (공증 불가)"
+fi
+if [[ $ADHOC -eq 0 ]]; then
+  while IFS= read -r code; do
+    INFO="$(codesign -dv "$code" 2>&1)"
+    [[ "$INFO" == *"TeamIdentifier=$TEAM"* && "$INFO" == *runtime* ]] \
+      || fail "Developer ID·Hardened Runtime 으로 서명되지 않은 코드: ${code#$APP/}"
+  done < <(find "$APP/Contents/Frameworks" \( -name "*.framework" -o -name "*.app" -o -name "*.xpc" -o -name Autoupdate \) -not -path "*/Versions/Current/*" -not -path "*.framework/Autoupdate")
+  echo "안쪽 코드 서명 확인됨"
 fi
 
 notarize() {
@@ -135,9 +171,37 @@ fi
 
 (cd "$OUT" && shasum -a 256 "$(basename "$DMG")" > "$(basename "$DMG").sha256")
 
+# --- 자동 업데이트 목록 ------------------------------------------------------
+if [[ $ADHOC -eq 0 ]]; then
+  step "업데이트 목록 (appcast.xml)"
+  SPARKLE_BIN="$OUT/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin"
+  [[ -x "$SPARKLE_BIN/generate_appcast" ]] || fail "Sparkle 도구를 찾지 못했습니다 ($SPARKLE_BIN)"
+  "$SPARKLE_BIN/generate_keys" --account "$SPARKLE_ACCOUNT" -p >/dev/null 2>&1 \
+    || fail "업데이트 서명 키가 키체인에 없습니다 (사전 준비 4)"
+  FEED="$OUT/feed"
+  rm -rf "$FEED"
+  mkdir -p "$FEED"
+  cp "$DMG" "$FEED/"
+  # 업데이트 창에 보일 변경 내용: CHANGELOG 의 이 버전 부분
+  awk -v v="$VERSION" '
+    $0 ~ "^## \\[" v "\\]" { on = 1; next }
+    on && /^## \[/ { exit }
+    on { print }
+  ' CHANGELOG.md > "$FEED/MyTerminal-$VERSION.md"
+  [[ -s "$FEED/MyTerminal-$VERSION.md" ]] || echo "주의: CHANGELOG.md 에 $VERSION 부분이 없어 변경 내용 없이 만듭니다"
+  "$SPARKLE_BIN/generate_appcast" --account "$SPARKLE_ACCOUNT" \
+    --download-url-prefix "$DOWNLOAD_URL_PREFIX" \
+    --full-release-notes-url "https://github.com/$REPO/releases/tag/v$VERSION" \
+    --embed-release-notes "$FEED"
+  cp "$FEED/appcast.xml" "$OUT/appcast.xml"
+  grep -q "sparkle:edSignature" "$OUT/appcast.xml" || fail "appcast.xml 에 업데이트 서명이 없습니다"
+  grep -q "<sparkle:version>$BUILD</sparkle:version>" "$OUT/appcast.xml" || fail "appcast.xml 의 빌드 번호가 $BUILD 가 아닙니다"
+fi
+
 step "완료"
 echo "$DMG"
 cat "$DMG.sha256"
+[[ -f "$OUT/appcast.xml" ]] && echo "$OUT/appcast.xml  ← 릴리스에 DMG 와 함께 올린다 (자동 업데이트)"
 if [[ $NOTARIZE -eq 0 ]]; then
   echo "주의: 공증하지 않았습니다. 다른 Mac 에서는 Gatekeeper 경고가 뜹니다."
 fi

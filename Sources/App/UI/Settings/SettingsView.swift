@@ -11,8 +11,49 @@ struct SettingsView: View {
                 .tabItem { Label("테마", systemImage: "paintpalette") }
             AISettingsPane()
                 .tabItem { Label("AI", systemImage: "sparkles") }
+            UpdateSettingsPane()
+                .tabItem { Label("업데이트", systemImage: "arrow.down.circle") }
         }
         .frame(width: 560, height: 520)
+    }
+}
+
+// MARK: - 업데이트
+
+private struct UpdateSettingsPane: View {
+    @ObservedObject private var updater = AppUpdater.shared
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .medium
+        f.timeStyle = .short
+        return f
+    }()
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("지금 버전", value: AppUpdater.currentVersion)
+                LabeledContent("마지막 확인", value: updater.lastCheck.map { Self.dateFormatter.string(from: $0) } ?? "아직 없음")
+                Button("지금 업데이트 확인") { updater.checkForUpdates() }
+                    .disabled(!updater.canCheckForUpdates)
+            }
+            Section {
+                Toggle("자동으로 업데이트 확인 (하루에 한 번)", isOn: Binding(
+                    get: { updater.automaticallyChecks }, set: { updater.automaticallyChecks = $0 }))
+                Toggle("새 버전을 미리 받아 두고 앱을 끝낼 때 설치", isOn: Binding(
+                    get: { updater.automaticallyDownloads }, set: { updater.automaticallyDownloads = $0 }))
+                    .disabled(!updater.automaticallyChecks)
+            } footer: {
+                Text(updater.isAvailable
+                     ? "GitHub 릴리스에서 새 버전을 확인합니다. 받은 파일은 서명을 확인한 뒤에만 설치하며, 사용 환경 정보는 보내지 않습니다."
+                     : "개발 빌드에서는 자동 업데이트를 쓰지 않습니다.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .disabled(!updater.isAvailable)
     }
 }
 

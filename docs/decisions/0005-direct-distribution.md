@@ -17,7 +17,7 @@ Xcode 에서 App Store Connect 로 업로드했더니 "App sandbox not enabled �
 
 - 배포는 **Developer ID Application 서명 + Apple 공증(notarization)** 으로 한다 (Xcode Organizer 의 "Direct Distribution").
 - 공증에 필요한 **Hardened Runtime** 은 Release 빌드에서 켠다. Debug 는 끈다 (임시 서명 환경에서도 테스트 번들을 불러오도록).
-- 배포 파일은 DMG (GitHub Release). 이후 Sparkle 자동 업데이트, Homebrew Cask.
+- 배포 파일은 DMG (GitHub Release). 자동 업데이트는 Sparkle (ADR 0006), 이후 Homebrew Cask.
 
 ## 확인
 

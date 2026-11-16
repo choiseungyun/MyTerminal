@@ -29,5 +29,6 @@
 - [0003. 비밀번호 자동 입력은 SSH_ASKPASS 와 로컬 소켓으로 한다](decisions/0003-askpass-password-autofill.md)
 - [0004. SFTP 는 시스템 OpenSSH 위에서 프로토콜을 직접 구현한다](decisions/0004-sftp-over-openssh.md)
 - [0005. Mac App Store 가 아니라 Developer ID 로 직접 배포한다](decisions/0005-direct-distribution.md)
+- [0006. 자동 업데이트는 Sparkle 로, 업데이트 목록은 GitHub 릴리스에 둔다](decisions/0006-sparkle-auto-update.md)
 
 새 결정은 `decisions/NNNN-제목.md` 형식으로 추가합니다.

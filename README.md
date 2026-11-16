@@ -26,6 +26,7 @@ AI 도우미는 각자의 API 키를 넣어 씁니다(BYOK). 비밀번호·토�
 [Releases](../../releases) 에서 `MyTerminal-<버전>.dmg` 를 받아 Applications 로 끌어 넣습니다.
 
 - macOS 14 (Sonoma) 이상, Apple Silicon · Intel
+- 0.1.2 부터 **자동 업데이트**: 새 버전이 나오면 알려 주고 설치합니다 (앱 메뉴 > 업데이트 확인…, 설정 > 업데이트). 0.1.0·0.1.1 은 0.1.2 를 한 번 직접 받아 주세요.
 - Mac App Store 에는 없습니다. 터미널은 셸과 `ssh` 를 실행해야 해서 앱 샌드박스를 쓸 수 없기 때문입니다 ([ADR 0005](docs/decisions/0005-direct-distribution.md)).
 
 ## 빌드
@@ -61,7 +62,7 @@ xcodegen generate
 
 ### 배포 파일 만들기
 
-Developer ID 서명 → 공증 → DMG 는 [`scripts/release.sh`](scripts/release.sh) 가 합니다. 사전 준비는 스크립트 머리 주석에 있습니다.
+Developer ID 서명 → 공증 → DMG → 자동 업데이트 목록(`appcast.xml`)은 [`scripts/release.sh`](scripts/release.sh) 가 합니다. 사전 준비는 스크립트 머리 주석에 있습니다.
 
 ```sh
 scripts/release.sh                 # 서명 + 공증 + 스테이플 → build/release/MyTerminal-<버전>.dmg
@@ -87,6 +88,6 @@ scripts/release.sh --adhoc         # 인증서 없이 패키징만 확인
 
 ## 라이선스
 
-[MIT](LICENSE). 함께 포함된 Ghostty(MIT), GRDB.swift(MIT), 글꼴·테마의 고지는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 에 있습니다 (앱의 도움말 > 오픈소스 라이선스).
+[MIT](LICENSE). 함께 포함된 Ghostty(MIT), GRDB.swift(MIT), Sparkle(MIT), 글꼴·테마의 고지는 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 에 있습니다 (앱의 도움말 > 오픈소스 라이선스).
 
 MyTerminal 은 Ghostty 프로젝트와 관계가 없으며, Ghostty 프로젝트가 보증하거나 지원하지 않습니다.

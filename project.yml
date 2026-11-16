@@ -14,6 +14,10 @@ packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift
     from: 7.12.0
+  # 자동 업데이트 (MIT). 업데이트 목록(appcast.xml)과 EdDSA 서명으로 새 버전을 확인·설치
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.10.1
 
 # 코드 서명: 공용 기본값 + 개인 설정(Config/Signing.local.xcconfig, git 제외)
 configFiles:
@@ -23,8 +27,8 @@ configFiles:
 settings:
   base:
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "0.1.1"
-    CURRENT_PROJECT_VERSION: "2"
+    MARKETING_VERSION: "0.1.2"
+    CURRENT_PROJECT_VERSION: "3"
 
 targets:
   MyTerminal:
@@ -55,6 +59,7 @@ targets:
       - framework: Frameworks/GhosttyKit.xcframework
         embed: false
       - package: GRDB
+      - package: Sparkle
       - sdk: Carbon.framework
       - sdk: Metal.framework
       - sdk: MetalKit.framework
@@ -72,6 +77,12 @@ targets:
         LSApplicationCategoryType: public.app-category.developer-tools
         LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
         NSHumanReadableCopyright: "Copyright © 2026 MyTerminal contributors. MIT License. Powered by libghostty."
+        # 자동 업데이트 (Sparkle): 항상 최신 릴리스의 appcast.xml 을 본다.
+        # 받은 파일은 이 공개 키와 맞는 EdDSA 서명이 있어야 설치된다 (비밀 키는 릴리스하는 Mac 의 키체인에만 있다).
+        SUFeedURL: https://github.com/choiseungyun/MyTerminal/releases/latest/download/appcast.xml
+        SUPublicEDKey: 2+cup1VLr6kzZveNX8Uc2mrjuL0N1eQxVeMI9tPI8K0=
+        # 사용 환경 정보(OS·CPU 등)는 보내지 않는다
+        SUEnableSystemProfiling: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: kr.weare.myterminal
