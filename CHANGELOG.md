@@ -2,7 +2,9 @@
 
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 를 따르고, 버전은 [Semantic Versioning](https://semver.org/lang/ko/) 을 따릅니다.
 
-## [Unreleased]
+## [0.1.1] - 2026-11-16
+
+SFTP 끌어 놓기 수정 버전입니다.
 
 ### 수정
 
