@@ -196,7 +196,7 @@ struct LocalBrowserPanel: View {
                     items.forEach { NSWorkspace.shared.open($0.url) }
                 }
             },
-            dropTypes: [.fileURL, .data],
+            dropTypes: [.fileURL, .data, .folder],   // .folder: 원격 칸에서 끈 폴더
             onDrop: handleDrop,
             dropTargeted: $dropTargeted)
         .overlay {
@@ -242,6 +242,7 @@ struct LocalBrowserPanel: View {
         // 앱 안의 서버 칸에서 끈 파일: 시스템이 넘겨주는 파일을 받지 않고 서버에서 바로 내려받는다
         // (원래 이름 그대로, 전송 목록에 진행률 표시, 시스템 파일 약속을 남기지 않음)
         if let drag = SFTPInAppDrag.take(for: providers) {
+            dragLog.info("앱 안에 놓음: 서버에서 바로 받음 \(drag.entries.count, privacy: .public)개")
             Task {
                 await drag.browser.download(drag.entries, to: destination)
                 browser.refresh()

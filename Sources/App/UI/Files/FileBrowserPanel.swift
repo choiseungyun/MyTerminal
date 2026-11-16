@@ -216,7 +216,7 @@ struct FileBrowserPanel: View {
                     name: entry.name, path: entry.path, isDirectory: entry.isDirectory, isSymlink: entry.isSymlink,
                     size: entry.size, modified: entry.modified, showsDate: panelWidth >= 400)
             },
-            dragProvider: { entry in entry.isDirectory ? nil : dragProvider(entry) },
+            dragProvider: { entry in dragProvider(entry) },
             menu: { items in AnyView(menu(for: items)) },
             primaryAction: primaryAction,
             dropTypes: [.fileURL],
@@ -368,16 +368,27 @@ struct FileBrowserPanel: View {
         }
     }
 
-    /// 파일을 Finder 등으로 끌어낼 때: 놓는 순간 임시 폴더로 받아 넘겨준다.
+    /// 파일·폴더를 끌 때.
+    /// - 앱 안(SFTP 탭 이 Mac 칸)에 놓이면 `SFTPInAppDrag` 기록으로 놓은 폴더에 바로 내려받는다.
+    /// - Finder 등에 놓이면 시스템이 파일을 요청한다: 그때 임시 폴더로 받아 넘겨준다.
+    ///   앱 안에 놓은 끌기에도 이 요청이 오는 일이 있어서, 잠깐 기다렸다가 앱 안에서 이미 받았으면 건너뛴다.
     private func dragProvider(_ entry: SFTPEntry) -> NSItemProvider {
-        // 앱 안(SFTP 탭 이 Mac 칸)에 놓이면 이 기록으로 바로 내려받는다
-        SFTPInAppDrag.begin(browser: browser, entries: [entry])
+        let dragID = SFTPInAppDrag.begin(browser: browser, entries: [entry])
         let provider = NSItemProvider()
         provider.suggestedName = entry.name
-        let type = UTType(filenameExtension: (entry.name as NSString).pathExtension) ?? .data
+        let type: UTType = entry.isDirectory
+            ? .folder
+            : UTType(filenameExtension: (entry.name as NSString).pathExtension) ?? .data
         provider.registerFileRepresentation(forTypeIdentifier: type.identifier, fileOptions: [], visibility: .all) { completion in
             let progress = Progress(totalUnitCount: 1)
             Task { @MainActor in
+                try? await Task.sleep(for: SFTPInAppDrag.promiseDelay)
+                if SFTPInAppDrag.shouldSkipPromise(for: dragID) {
+                    dragLog.info("시스템 파일 요청 건너뜀: 앱 안에서 이미 받음")
+                    completion(nil, false, CocoaError(.userCancelled))
+                    return
+                }
+                dragLog.info("시스템 파일 요청: 임시 폴더로 받음 (폴더: \(entry.isDirectory, privacy: .public))")
                 do {
                     let url = try await browser.downloadToTemporary(entry)
                     progress.completedUnitCount = 1

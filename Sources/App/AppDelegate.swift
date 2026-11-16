@@ -26,6 +26,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 종료 감시 사용 여부 (테스트에서는 끈다: 종료 판단만 부르고 실제로 끝내지 않으므로)
     var terminationWatchdogEnabled = true
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // 지난 실행에서 Finder 로 끌어 내보낼 때 쓴 임시 폴더 정리
+        DispatchQueue.global(qos: .utility).async {
+            let removed = RemoteBrowser.removeDragTemporaries()
+            if removed > 0 { lifecycleLog.info("끌기 임시 폴더 정리: \(removed, privacy: .public)개") }
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }

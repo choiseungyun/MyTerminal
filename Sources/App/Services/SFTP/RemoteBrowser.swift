@@ -267,57 +267,68 @@ final class RemoteBrowser: ObservableObject {
 
     /// 원격 파일·폴더를 로컬 폴더로 받는다. 같은 이름이 있으면 " 2" 를 붙인다.
     func download(_ items: [SFTPEntry], to directory: URL) async {
-        guard let client else { return }
         for item in items {
             let target = Self.uniqueURL(directory.appendingPathComponent(item.name))
-            let transferID = startTransfer(FileTransfer(name: item.name, direction: .download, totalBytes: item.size))
-            do {
-                if item.isDirectory {
-                    let files = try await Self.remoteFiles(client, under: item.path)
-                    mutateTransfer(transferID) { $0.totalBytes = files.reduce(0) { $0 + $1.size } }
-                    var base: UInt64 = 0
-                    try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
-                    for file in files {
-                        let local = target.appendingPathComponent(file.relativePath)
-                        if file.isDirectory {
-                            try FileManager.default.createDirectory(at: local, withIntermediateDirectories: true)
-                            continue
-                        }
-                        let offset = base
-                        try await client.download(file.path, to: local) { [weak self] got in
-                            Task { @MainActor in self?.updateTransfer(transferID, done: offset + got) }
-                        }
-                        base += file.size
-                    }
-                } else {
-                    try await client.download(item.path, to: target) { [weak self] got in
-                        Task { @MainActor in self?.updateTransfer(transferID, done: got) }
-                    }
-                }
-                mutateTransfer(transferID) { $0.localURL = target }
-                finishTransfer(transferID)
-            } catch {
-                try? FileManager.default.removeItem(at: target)
-                failTransfer(transferID, error)
-            }
+            try? await receive(item, to: target)
         }
     }
 
-    /// 끌어서 Finder 로 내보낼 때: 임시 폴더에 받아 그 위치를 돌려준다.
+    /// 끌어서 Finder 로 내보낼 때: 임시 폴더에 받아 그 위치를 돌려준다. (폴더도 됨)
     func downloadToTemporary(_ item: SFTPEntry) async throws -> URL {
-        guard let client else { throw SFTPError.connectionLost("") }
         let folder = FileManager.default.temporaryDirectory
-            .appendingPathComponent("MyTerminal-drag-\(UUID().uuidString)")
+            .appendingPathComponent("\(Self.dragFolderPrefix)\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let target = folder.appendingPathComponent(item.name)
+        try await receive(item, to: target)
+        return target
+    }
+
+    /// 끌어 내보내기용 임시 폴더 이름 앞부분
+    nonisolated static let dragFolderPrefix = "MyTerminal-drag-"
+
+    /// 지난 실행에서 남은 끌어 내보내기용 임시 폴더를 지운다. (앱을 시작할 때 — 끄는 중인 것이 없을 때)
+    @discardableResult
+    nonisolated static func removeDragTemporaries(in directory: URL = FileManager.default.temporaryDirectory) -> Int {
+        let fm = FileManager.default
+        let names = (try? fm.contentsOfDirectory(atPath: directory.path)) ?? []
+        var removed = 0
+        for name in names where name.hasPrefix(dragFolderPrefix) {
+            if (try? fm.removeItem(at: directory.appendingPathComponent(name))) != nil { removed += 1 }
+        }
+        return removed
+    }
+
+    /// 파일 하나 또는 폴더 하나(안의 것 모두)를 target 에 받는다. 전송 목록에 진행률을 보이고, 실패하면 받던 것을 지운다.
+    private func receive(_ item: SFTPEntry, to target: URL) async throws {
         let transferID = startTransfer(FileTransfer(name: item.name, direction: .download, totalBytes: item.size))
         do {
-            try await client.download(item.path, to: target) { [weak self] got in
-                Task { @MainActor in self?.updateTransfer(transferID, done: got) }
+            guard let client else { throw SFTPError.connectionLost("") }
+            if item.isDirectory {
+                let files = try await Self.remoteFiles(client, under: item.path)
+                mutateTransfer(transferID) { $0.totalBytes = files.reduce(0) { $0 + $1.size } }
+                var base: UInt64 = 0
+                try FileManager.default.createDirectory(at: target, withIntermediateDirectories: true)
+                for file in files {
+                    let local = target.appendingPathComponent(file.relativePath)
+                    if file.isDirectory {
+                        try FileManager.default.createDirectory(at: local, withIntermediateDirectories: true)
+                        continue
+                    }
+                    let offset = base
+                    try await client.download(file.path, to: local) { [weak self] got in
+                        Task { @MainActor in self?.updateTransfer(transferID, done: offset + got) }
+                    }
+                    base += file.size
+                }
+            } else {
+                try await client.download(item.path, to: target) { [weak self] got in
+                    Task { @MainActor in self?.updateTransfer(transferID, done: got) }
+                }
             }
+            mutateTransfer(transferID) { $0.localURL = target }
             finishTransfer(transferID)
-            return target
         } catch {
+            try? FileManager.default.removeItem(at: target)
             failTransfer(transferID, error)
             throw error
         }

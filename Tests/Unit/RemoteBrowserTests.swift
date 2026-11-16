@@ -82,6 +82,43 @@ final class RemoteBrowserTests: XCTestCase {
         SFTPInAppDrag.reset()
     }
 
+    /// 회귀: 서버 칸의 폴더를 이 Mac 칸으로 끌어도 받아지지 않음 (폴더는 끌 수 없었다)
+    func testInAppDragDownloadsFolder() async throws {
+        try FileManager.default.createDirectory(atPath: remote + "/site/css", withIntermediateDirectories: true)
+        try Data("<html>".utf8).write(to: URL(fileURLWithPath: remote + "/site/index.html"))
+        try Data("body{}".utf8).write(to: URL(fileURLWithPath: remote + "/site/css/a.css"))
+        await browser.refresh()
+        let folder = try XCTUnwrap(browser.entries.first { $0.name == "site" })
+
+        SFTPInAppDrag.begin(browser: browser, entries: [folder])
+        let provider = NSItemProvider()
+        provider.suggestedName = "site"
+        let drag = try XCTUnwrap(SFTPInAppDrag.take(for: [provider]))
+        await drag.browser.download(drag.entries, to: local)
+
+        XCTAssertEqual(try String(contentsOf: local.appendingPathComponent("site/css/a.css"), encoding: .utf8), "body{}")
+        XCTAssertEqual(try String(contentsOf: local.appendingPathComponent("site/index.html"), encoding: .utf8), "<html>")
+        XCTAssertEqual(browser.transfers.count, 1, "폴더 하나는 전송 하나")
+        XCTAssertEqual(browser.transfers.last?.doneBytes, 12)
+        SFTPInAppDrag.reset()
+    }
+
+    /// 회귀: 앱 안에 한 번 놓았는데 같은 파일이 두 번 받아짐 (놓은 폴더 + 시스템 요청으로 임시 폴더)
+    func testPromiseIsSkippedOnlyForDragsHandledInApp() throws {
+        let entry = SFTPEntry(name: "a.dmg", path: remote + "/a.dmg", size: 1, permissions: 0o644, modified: nil, isDirectory: false, isSymlink: false)
+
+        let inApp = SFTPInAppDrag.begin(browser: browser, entries: [entry])
+        XCTAssertFalse(SFTPInAppDrag.shouldSkipPromise(for: inApp), "놓기 전에는 모른다")
+        let provider = NSItemProvider()
+        provider.suggestedName = "a.dmg"
+        XCTAssertNotNil(SFTPInAppDrag.take(for: [provider]))
+        XCTAssertTrue(SFTPInAppDrag.shouldSkipPromise(for: inApp), "앱 안에서 받았으니 시스템 요청은 건너뛴다")
+
+        let toFinder = SFTPInAppDrag.begin(browser: browser, entries: [entry])
+        XCTAssertFalse(SFTPInAppDrag.shouldSkipPromise(for: toFinder), "Finder 로 끈 것은 받아야 한다")
+        SFTPInAppDrag.reset()
+    }
+
     func testNavigationAndPathComponents() async throws {
         try FileManager.default.createDirectory(atPath: remote + "/a/b", withIntermediateDirectories: true)
         await browser.open(remote + "/a/b")
@@ -152,6 +189,25 @@ final class RemoteBrowserTests: XCTestCase {
         let url = try await browser.downloadToTemporary(browser.entries[0])
         XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "drag")
         try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+    }
+
+    func testDownloadFolderToTemporaryForDragOut() async throws {
+        try FileManager.default.createDirectory(atPath: remote + "/dir/sub", withIntermediateDirectories: true)
+        try Data("x".utf8).write(to: URL(fileURLWithPath: remote + "/dir/sub/x.txt"))
+        await browser.refresh()
+        let url = try await browser.downloadToTemporary(browser.entries[0])
+        XCTAssertEqual(url.lastPathComponent, "dir")
+        XCTAssertEqual(try String(contentsOf: url.appendingPathComponent("sub/x.txt"), encoding: .utf8), "x")
+        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+    }
+
+    func testRemovesLeftoverDragTemporaries() throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: local.appendingPathComponent("MyTerminal-drag-1/a"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: local.appendingPathComponent("MyTerminal-drag-2"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: local.appendingPathComponent("keep"), withIntermediateDirectories: true)
+        XCTAssertEqual(RemoteBrowser.removeDragTemporaries(in: local), 2)
+        XCTAssertEqual(try fm.contentsOfDirectory(atPath: local.path), ["keep"])
     }
 }
 

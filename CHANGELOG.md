@@ -2,6 +2,14 @@
 
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 를 따르고, 버전은 [Semantic Versioning](https://semver.org/lang/ko/) 을 따릅니다.
 
+## [Unreleased]
+
+### 수정
+
+- SFTP 탭: 서버 칸의 폴더를 이 Mac 칸이나 Finder 로 끌어 받을 수 있게 함
+- SFTP 탭: 서버 파일을 이 Mac 칸으로 한 번 끌었는데 두 번 받아지던 문제
+- 끌어 내보낼 때 쓴 임시 폴더가 남던 문제 (앱 시작 때 정리)
+
 ## [0.1.0] - 2026-11-14
 
 첫 공개 버전입니다.
