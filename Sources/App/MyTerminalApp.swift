@@ -9,6 +9,7 @@ struct MyTerminalApp: App {
     init() {
         // 저장된 설정으로 settings.conf 를 만든 뒤 libghostty 를 초기화한다 (첫 화면보다 먼저).
         PreferencesMigration.run()   // 번들 ID 변경 전 설정 옮기기 (설정을 읽기 전에)
+        AppearanceSettings.shared.start()   // 앱 모양 먼저: 터미널 기본 색이 이것을 따른다
         TerminalSettings.shared.writeConfigFile()
         RemoteEditor.cleanUpPreviousSession()
         _ = GhosttyRuntime.shared
@@ -101,7 +102,6 @@ struct MyTerminalApp: App {
 
         Settings {
             SettingsView()
-                .preferredColorScheme(.dark)
         }
     }
 }

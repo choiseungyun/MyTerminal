@@ -214,8 +214,8 @@ private struct PaneView: View {
             }
             TerminalSurface(view: pane.view, isFocused: isFocused)
                 .overlay(
-                    Color.black
-                        .opacity(isFocused || !isSplit ? 0 : 0.3)
+                    Theme.inactivePaneOverlay
+                        .opacity(isFocused || !isSplit ? 0 : 1)
                         .allowsHitTesting(false))
         }
         // 포커스된 화면은 서버 색 테두리

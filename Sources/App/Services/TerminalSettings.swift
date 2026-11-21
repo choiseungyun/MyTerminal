@@ -55,8 +55,41 @@ final class TerminalSettings: ObservableObject {
     static let defaultFontSize = 13.0
     static let fontSizeRange = 8.0...32.0
 
-    /// MyTerminal 기본 색 (UI 색상 Theme.terminalBackground 와 맞춘다)
-    static let defaultColors = ["background = #1b1e2b", "foreground = #e3e6ee"]
+    /// MyTerminal 기본 색 — 어두운 앱 모양 (UI 색상 Theme.terminalBackground 와 맞춘다). 16색은 엔진 기본값.
+    static let defaultDarkColors = ["background = #1b1e2b", "foreground = #e3e6ee"]
+
+    /// MyTerminal 기본 색 — 밝은 앱 모양. 엔진 기본 16색은 어두운 배경용이라(노랑·흰색이 안 보임) 직접 정한다.
+    /// 7·15(흰색)는 밝은 배경에서 읽히도록 회색으로 둔다.
+    static let defaultLightColors = [
+        "background = #fbfbfd",
+        "foreground = #2b2f3a",
+        "cursor-color = #3c73de",
+        "selection-background = #cfdcf5",
+        "selection-foreground = #2b2f3a",
+        "palette = 0=#2b2f3a",
+        "palette = 1=#c8364b",
+        "palette = 2=#2f8a4f",
+        "palette = 3=#9c6a00",
+        "palette = 4=#2f63c9",
+        "palette = 5=#8c4bc4",
+        "palette = 6=#12808f",
+        "palette = 7=#6e7484",
+        "palette = 8=#5d6273",
+        "palette = 9=#dc4a60",
+        "palette = 10=#38a05f",
+        "palette = 11=#b7851a",
+        "palette = 12=#4a7ee0",
+        "palette = 13=#a565dc",
+        "palette = 14=#1c9bb0",
+        "palette = 15=#8c919f",
+    ]
+
+    static func defaultColors(dark: Bool) -> [String] {
+        dark ? defaultDarkColors : defaultLightColors
+    }
+
+    /// settings.conf 를 마지막으로 쓸 때의 앱 모양 (모양이 바뀌었을 때만 다시 쓰려고)
+    private var writtenForDark: Bool?
 
     private let defaults = UserDefaults.standard
     private var cancellables: Set<AnyCancellable> = []
@@ -88,8 +121,8 @@ final class TerminalSettings: ObservableObject {
         useGhosttyTerminfo = false
     }
 
-    /// settings.conf 내용 (Ghostty 설정 형식)
-    var configText: String {
+    /// settings.conf 내용 (Ghostty 설정 형식). `dark`: 앱이 어두운 모양인지 (기본 색 고르기)
+    func configText(dark: Bool) -> String {
         var lines = [
             "# MyTerminal 설정 화면이 만든 파일입니다. 직접 고치지 말고 terminal.conf 를 쓰세요.",
             "font-size = \(Self.format(fontSize))",
@@ -101,7 +134,7 @@ final class TerminalSettings: ObservableObject {
         if !fontFamily.isEmpty { lines.append("font-family = \(Self.quote(fontFamily))") }
         // 배경·글자색을 직접 쓰면 테마보다 우선하므로, 테마를 고르면 색을 쓰지 않는다.
         if theme.isEmpty {
-            lines += Self.defaultColors
+            lines += Self.defaultColors(dark: dark)
         } else {
             lines.append("theme = \(Self.quote(theme))")
         }
@@ -111,13 +144,23 @@ final class TerminalSettings: ObservableObject {
     /// 앱 시작 시 한 번: 저장된 설정으로 settings.conf 를 만든다 (엔진 초기화 전에 호출).
     func writeConfigFile() {
         guard let url = GhosttyRuntime.settingsConfigURL else { return }
+        let dark = AppearanceSettings.isDark
         do {
             try FileManager.default.createDirectory(
                 at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try configText.write(to: url, atomically: true, encoding: .utf8)
+            try configText(dark: dark).write(to: url, atomically: true, encoding: .utf8)
+            writtenForDark = dark
         } catch {
             NSLog("[MyTerminal] settings.conf 저장 실패: \(error)")
         }
+    }
+
+    /// 앱 모양이 바뀌었을 때 (설정 화면 또는 시스템 설정). 기본 색을 쓰는 중이면 열린 터미널 색도 바꾼다.
+    func appearanceDidChange() {
+        let dark = AppearanceSettings.isDark
+        guard theme.isEmpty, writtenForDark != dark else { return }
+        writeConfigFile()
+        GhosttyRuntime.shared.reloadConfig()
     }
 
     private func save() {

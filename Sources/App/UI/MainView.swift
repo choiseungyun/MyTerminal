@@ -16,7 +16,6 @@ struct MainView: View {
         .coordinateSpace(name: workspaceCoordinateSpace)
         .background(Theme.windowBackground)
         .ignoresSafeArea(edges: .top)
-        .preferredColorScheme(.dark)
         .frame(minWidth: 900, minHeight: 560)
         .onAppear {
             // 개발용 실행 옵션 (`open MyTerminal.app --args --open-terminal --split`)

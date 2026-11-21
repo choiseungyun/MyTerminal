@@ -194,7 +194,7 @@ private struct TerminalSettingsPane: View {
                     Stepper("", value: $settings.fontSize, in: TerminalSettings.fontSizeRange, step: 1)
                         .labelsHidden()
                 }
-                FontPreview(family: settings.fontFamily, size: settings.fontSize)
+                FontPreview(family: settings.fontFamily, size: settings.fontSize, theme: settings.theme)
             }
 
             Section("커서") {
@@ -273,18 +273,22 @@ private struct TerminalSettingsPane: View {
 private struct FontPreview: View {
     let family: String
     let size: Double
+    /// 빈 문자열 = MyTerminal 기본 색 (앱 모양을 따름)
+    let theme: String
 
     var body: some View {
         let font: Font = family.isEmpty
             ? .system(size: size, design: .monospaced)
             : .custom(family, size: size)
+        let preview = theme.isEmpty ? nil : ThemeCatalog.preview(theme)
         Text("deploy@web-01:~$ ls -la  가나다 0O1lI")
             .font(font)
-            .foregroundStyle(Color(hex: 0xE3E6EE))
+            .foregroundStyle(preview?.foreground ?? Theme.terminalForeground)
             .lineLimit(1)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 6).fill(Color(hex: 0x1B1E2B)))
+            .background(RoundedRectangle(cornerRadius: 6).fill(preview?.background ?? Theme.terminalBackground))
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Theme.divider))
     }
 }
 
@@ -292,6 +296,7 @@ private struct FontPreview: View {
 
 private struct ThemeSettingsPane: View {
     @ObservedObject private var settings = TerminalSettings.shared
+    @ObservedObject private var appearance = AppearanceSettings.shared
     @State private var query = ""
 
     private var filtered: [String] {
@@ -302,6 +307,35 @@ private struct ThemeSettingsPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("앱 모양").font(.headline)
+                    Text("창·메뉴·설정 화면의 밝기. 시스템은 macOS 설정을 따릅니다.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                Picker("앱 모양", selection: $appearance.mode) {
+                    ForEach(AppearanceSettings.Mode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            Divider()
+
+            HStack {
+                Text("터미널 색").font(.headline)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("테마 검색 (\(ThemeCatalog.names.count)개)", text: $query)
@@ -314,10 +348,10 @@ private struct ThemeSettingsPane: View {
             ScrollViewReader { proxy in
                 List {
                     ThemeRow(
-                        name: "MyTerminal 기본",
+                        name: "MyTerminal 기본 (앱 모양을 따름)",
                         preview: .init(
-                            background: Color(hex: 0x1B1E2B),
-                            foreground: Color(hex: 0xE3E6EE),
+                            background: Theme.terminalBackground,
+                            foreground: Theme.terminalForeground,
                             palette: []),
                         isSelected: settings.theme.isEmpty
                     ) { settings.theme = "" }
@@ -337,7 +371,7 @@ private struct ThemeSettingsPane: View {
             }
 
             Divider()
-            Text("테마는 Ghostty 에 포함된 테마 모음입니다. 고르면 열려 있는 터미널에 바로 적용됩니다.")
+            Text("터미널 색은 Ghostty 에 포함된 테마 모음입니다. 고르면 열려 있는 터미널에 바로 적용됩니다. MyTerminal 기본은 앱 모양에 맞춰 밝은·어두운 색으로 바뀝니다.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(8)
@@ -366,7 +400,7 @@ private struct ThemeRow: View {
                 .padding(.horizontal, 8)
                 .frame(width: 132, height: 22, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 4).fill(preview?.background ?? .clear))
-                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(.white.opacity(0.08)))
+                .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.divider))
 
                 Text(name).lineLimit(1)
                 Spacer()
