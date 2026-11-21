@@ -451,19 +451,12 @@ struct HostCard: View {
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Theme.textPrimary)
                     .lineLimit(1)
-                HStack(spacing: 6) {
-                    Text(subtitle)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.textSecondary)
-                        .lineLimit(1)
-                    ForEach(tags.prefix(3), id: \.self) { tag in
-                        Text(tag)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Theme.textSecondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(Capsule().fill(Theme.selection))
+                // 태그는 줄바꿈하지 않는다: 카드 폭에 들어가는 만큼만 보이고 나머지는 "+N" 으로 줄인다.
+                ViewThatFits(in: .horizontal) {
+                    ForEach((1...max(shownTags.count, 1)).reversed(), id: \.self) { count in
+                        detailRow(tagCount: count, fitsFully: true)
                     }
+                    detailRow(tagCount: 0, fitsFully: false)
                 }
             }
             Spacer(minLength: 0)
@@ -496,6 +489,41 @@ struct HostCard: View {
         }
         .onHover { hovering = $0 }
         .help(help)
+    }
+
+    /// 카드에 보일 수 있는 태그 (최대 3개)
+    private var shownTags: [String] { Array(tags.prefix(3)) }
+
+    /// 부제목 + 앞의 태그 `tagCount` 개 + 나머지 개수.
+    /// `fitsFully`: 부제목도 줄이지 않고 다 보여야 하는 후보 (안 되면 ViewThatFits 가 다음 후보로 넘어간다).
+    /// 마지막 후보(태그 0개)는 부제목을 말줄임으로 줄인다.
+    private func detailRow(tagCount: Int, fitsFully: Bool) -> some View {
+        let hidden = tags.count - tagCount
+        return HStack(spacing: 6) {
+            Text(subtitle)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.textSecondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: fitsFully, vertical: false)
+            ForEach(tags.prefix(tagCount), id: \.self) { tag in
+                tagChip(tag)
+            }
+            if hidden > 0 {
+                tagChip("+\(hidden)")
+                    .help(tags.suffix(hidden).joined(separator: ", "))
+            }
+        }
+    }
+
+    private func tagChip(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(Theme.textSecondary)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 6)
+            .padding(.vertical, 1)
+            .background(Capsule().fill(Theme.selection))
     }
 }
 
