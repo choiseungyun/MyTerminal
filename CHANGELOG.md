@@ -2,11 +2,12 @@
 
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 를 따르고, 버전은 [Semantic Versioning](https://semver.org/lang/ko/) 을 따릅니다.
 
-## [Unreleased]
+## [0.1.4] - 2026-11-24
 
 ### 추가
 
 - **AI 제공자에 LG EXAONE 추가**: 설정 > AI 에서 "EXAONE (LG AI연구원)" 을 고르고 [EXAONE API](https://docs.exaone.ai) 키를 넣으면 한국어에 강한 K-EXAONE 2.5 로 명령 추천·설명·접속 진단을 쓸 수 있습니다.
+- AI 답을 기다리는 동안 경과 시간을 보여 줍니다. EXAONE 은 "생각하는 중… / 답을 쓰는 중…" 단계도 보여 줍니다 (EXAONE 은 답하기 전에 생각을 길게 해서 보통 10~60초 걸립니다).
 
 ## [0.1.3] - 2026-11-21
 

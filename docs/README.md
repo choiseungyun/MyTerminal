@@ -11,6 +11,7 @@
 | [plan/05-risks.md](plan/05-risks.md) | 위험 요소와 대응 |
 | [design/01-ui-ux.md](design/01-ui-ux.md) | UI/UX 설계 (Termius식 화면 구성, 와이어프레임) |
 | [analysis/01-ghostty-macos-app.md](analysis/01-ghostty-macos-app.md) | Ghostty macOS 앱 구조 분석, C API 흐름, 이식 대상 |
+| [release.md](release.md) | 릴리스와 자동 업데이트 절차 (버전 올리기 → 서명·공증 → GitHub 릴리스 → 확인) |
 | [features/](features/) | 기능별 설계 문서 |
 | [decisions/](decisions/) | 주요 결정 기록 (ADR) |
 

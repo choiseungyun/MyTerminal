@@ -62,7 +62,7 @@ xcodegen generate
 
 ### 배포 파일 만들기
 
-Developer ID 서명 → 공증 → DMG → 자동 업데이트 목록(`appcast.xml`)은 [`scripts/release.sh`](scripts/release.sh) 가 합니다. 사전 준비는 스크립트 머리 주석에 있습니다.
+Developer ID 서명 → 공증 → DMG → 자동 업데이트 목록(`appcast.xml`)은 [`scripts/release.sh`](scripts/release.sh) 가 합니다. 사전 준비는 스크립트 머리 주석에 있습니다. 버전 올리기부터 GitHub 릴리스·자동 업데이트 확인까지 전체 절차는 [docs/release.md](docs/release.md) 에 있습니다.
 
 ```sh
 scripts/release.sh                 # 서명 + 공증 + 스테이플 → build/release/MyTerminal-<버전>.dmg
