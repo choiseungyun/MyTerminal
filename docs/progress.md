@@ -1,7 +1,7 @@
 # 진행 현황
 
 - 마지막 갱신: 2026-11-24
-- 현재 단계: **v0.1.3 공개** (2026-11-21, 앱 모양 라이트·다크) (M1~M6, M1~M4 사용자 확인 완료) · M5 실제 API 확인은 결제 문제로 보류
+- 현재 단계: **v0.1.4 공개** (2026-11-24, AI 제공자 LG EXAONE) (M1~M6, M1~M4 사용자 확인 완료) · M5 실제 API 확인은 결제 문제로 보류
 - 저장소: [choiseungyun/MyTerminal](https://github.com/choiseungyun/MyTerminal) (**공개**, 2026-11-14). 공개 전 전체 기록은 비공개 `MyTerminal-dev` 에 보관
 
 ## 한눈에 보기
@@ -252,6 +252,7 @@
 
 | 날짜 | 단계 | 내용 |
 | --- | --- | --- |
+| 2026-11-24 | 릴리스 | **v0.1.4 릴리스 공개** (AI 제공자 LG EXAONE, 답 기다리는 동안 진행 표시): 버전 0.1.4(빌드 5), 서명·공증·스테이플된 universal DMG(23.0MB), Gatekeeper `accepted (Notarized Developer ID)`, appcast.xml(빌드 5, EdDSA 서명, 변경 내용 포함) 첨부. 공개 주소 `releases/latest/download/appcast.xml` 이 0.1.4(빌드 5)를 가리키고 내려받은 DMG 체크섬 일치 확인 → 0.1.2·0.1.3 사용자에게 자동 업데이트로 전달. 릴리스·자동 업데이트 절차 문서 [release.md](release.md) 작성 |
 | 2026-11-24 | M5 | 버그 수정(사용자 스크린샷): EXAONE ⌘K 가 "명령을 찾는 중…" 에서 진행되지 않음. 저장된 키로 실제 API 를 재어 보니 요청 형식(`response_format` 포함)은 정상이지만 생각이 항상 켜져 있고 느려(초당 약 30토큰) 같은 요청도 6~51초가 걸림. 한 번에 받는 방식이라 그동안 표시가 없고, 길어지면 120초 무응답 제한에 걸릴 수 있었음 → EXAONE 은 스트리밍(SSE)으로 받고(조각이 계속 와서 제한에 안 걸림, 오류 조각·[DONE] 없는 종료 처리), 기다리는 줄에 단계(생각하는 중·답을 쓰는 중)와 경과 초, 15초 뒤 안내(모든 제공자에 경과 초). 실제 API 로 확인: 생각 0.5초 표시, 추천 22.8초·설명 38초에 답. 테스트 2개 (전체 211개) |
 | 2026-11-24 | M5 | 사용자 요청: **AI 제공자에 LG EXAONE 추가**. 공식 문서(docs.exaone.ai) 확인: OpenAI 호환 `POST https://api.exaone.ai/v1/chat/completions`, Bearer 키, 모델 `k-exaone_v2.5`, 생각은 항상 켜짐(`reasoning_effort` low/high/max → 앱 low→low, medium→high), 답은 `content`(생각은 `reasoning_content`), 오류 본문 `{result_code, description}`. 구조화 출력은 지원 기능으로만 적혀 있어 `response_format`(json_schema)과 함께 시스템 프롬프트에도 스키마를 넣고, 응답에서 JSON 부분만 꺼내 읽음(앞 빈 줄·코드 블록). 키체인 계정 `exaone-api-key`. 화면 문구 조사 처리("EXAONE이 살펴보는 중…"). 테스트 5개 (전체 209개). 실제 API 호출은 키가 없어 미확인 |
 | 2026-11-21 | 릴리스 | **v0.1.3 릴리스 공개** (앱 모양 설정, 호스트 카드 태그 수정): 버전 0.1.3(빌드 4), 서명·공증·스테이플된 universal DMG(22.9MB), Gatekeeper `accepted (Notarized Developer ID)`, appcast.xml(빌드 4, EdDSA 서명) 첨부 → 0.1.2 사용자에게 자동 업데이트로 전달 |
