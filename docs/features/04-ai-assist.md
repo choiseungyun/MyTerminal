@@ -2,7 +2,7 @@
 
 마일스톤: M5 (**구현됨**, 실제 API 확인 대기)
 
-AI 로 터미널 작업을 돕습니다. 제공자는 **Claude · ChatGPT · Gemini** 중에서 고릅니다 (설정 > AI). AI 가 고른 명령은 **입력줄에만 들어가고 자동으로 실행되지 않습니다.**
+AI 로 터미널 작업을 돕습니다. 제공자는 **Claude · ChatGPT · Gemini · EXAONE** 중에서 고릅니다 (설정 > AI). AI 가 고른 명령은 **입력줄에만 들어가고 자동으로 실행되지 않습니다.**
 
 ## 기능
 
@@ -43,26 +43,28 @@ AI 로 터미널 작업을 돕습니다. 제공자는 **Claude · ChatGPT · Gem
 
 설정(⌘,) > AI 에서 제공자를 고릅니다. 키와 모델은 제공자마다 따로 저장합니다.
 
-| | Claude (Anthropic) | ChatGPT (OpenAI) | Gemini (Google) |
-| --- | --- | --- | --- |
-| API | Messages `POST /v1/messages` (`anthropic-version: 2026-10-21`) | Responses `POST /v1/responses` | Interactions `POST /v1beta/interactions` (`Api-Revision: 2026-05-20`) |
-| 인증 | `x-api-key` | `Authorization: Bearer` | `x-goog-api-key` |
-| JSON 응답 | `output_config.format` (json_schema) | `text.format` (json_schema, strict) | `response_format` (application/json + schema) |
-| 생각 깊이 | `output_config.effort` | `reasoning.effort` | `generation_config.thinking_level` |
-| 답 위치 | content 의 `text` 블록 (thinking 블록 무시) | output 의 message → `output_text` (reasoning 항목 무시) | steps 의 `model_output` → `text` (thought 무시) |
-| 서버 저장 | — | `store: false` | `store: false` |
-| 기본 모델 | `claude-opus-5-5` | `gpt-6-astra` | `gemini-4-carbon` |
-| 목록 | Opus·Sonnet·Haiku 5.5 | gpt-6-astra · gpt-6.1-sol · gpt-6.1-terra · gpt-6-luna | gemini-4-carbon · gemini-4-argon · gemini-3.8-flash · gemini-3.5-flash-lite |
+| | Claude (Anthropic) | ChatGPT (OpenAI) | Gemini (Google) | EXAONE (LG AI연구원) |
+| --- | --- | --- | --- | --- |
+| API | Messages `POST /v1/messages` (`anthropic-version: 2026-10-21`) | Responses `POST /v1/responses` | Interactions `POST /v1beta/interactions` (`Api-Revision: 2026-05-20`) | Chat Completions `POST api.exaone.ai/v1/chat/completions` (OpenAI 호환) |
+| 인증 | `x-api-key` | `Authorization: Bearer` | `x-goog-api-key` | `Authorization: Bearer` |
+| JSON 응답 | `output_config.format` (json_schema) | `text.format` (json_schema, strict) | `response_format` (application/json + schema) | `response_format` (json_schema) + 시스템 프롬프트에 스키마 |
+| 생각 깊이 | `output_config.effort` | `reasoning.effort` | `generation_config.thinking_level` | `reasoning_effort` (low→`low`, medium→`high`; 생각은 항상 켜짐) |
+| 답 위치 | content 의 `text` 블록 (thinking 블록 무시) | output 의 message → `output_text` (reasoning 항목 무시) | steps 의 `model_output` → `text` (thought 무시) | 스트리밍(SSE) `delta.content` 를 모음 (`reasoning_content` 는 진행 표시에만) |
+| 서버 저장 | — | `store: false` | `store: false` | 옵션 없음 |
+| 기본 모델 | `claude-opus-5-5` | `gpt-6-astra` | `gemini-4-carbon` | `k-exaone_v2.5` |
+| 목록 | Opus·Sonnet·Haiku 5.5 | gpt-6-astra · gpt-6.1-sol · gpt-6.1-terra · gpt-6-luna | gemini-4-carbon · gemini-4-argon · gemini-3.8-flash · gemini-3.5-flash-lite | k-exaone_v2.5 |
 
-- 세 제공자 모두 Swift 공식 SDK 가 없거나 쓰지 않고 `URLSession` 으로 직접 부릅니다 (`AIClient` 프로토콜: `ClaudeClient`, `OpenAIClient`, `GeminiClient`).
+- 모든 제공자를 Swift 공식 SDK 없이 `URLSession` 으로 직접 부릅니다 (`AIClient` 프로토콜: `ClaudeClient`, `OpenAIClient`, `GeminiClient`, `ExaoneClient`).
 - 요청·응답 모양과 모델 이름은 각 회사 공식 문서(2026-11) 기준입니다. 목록에 없는 모델은 "직접 입력…" 으로 쓸 수 있고, 이때는 지원 여부를 몰라 생각 깊이 값을 보내지 않습니다.
 - ⌘K 는 생각 깊이 `low`, 설명·진단은 `medium`. 출력 한도는 생각 토큰을 포함해 ⌘K 8,000, 설명 16,000.
+- EXAONE 은 생각이 항상 켜져 있고 속도가 느려(초당 약 30토큰) 답까지 보통 10~60초 걸립니다. 그래서 스트리밍으로 받아 120초 무응답 제한에 걸리지 않게 하고, 기다리는 동안 "생각하는 중… / 답을 쓰는 중…" 과 경과 초를 보여 줍니다 (다른 제공자는 경과 초만). 15초가 지나면 "생각이 길면 1분 넘게 걸릴 수 있습니다" 안내.
+- EXAONE 은 문서에 "Structured outputs" 가 지원 기능으로만 적혀 있고 요청 형식은 없어, OpenAI 형식 `response_format` 과 함께 시스템 프롬프트에도 스키마를 넣고, 답에서 JSON 부분만 꺼내 읽습니다(앞 빈 줄·코드 블록 무시). 오류 본문 `{"result_code", "description"}` 의 description 을 서버 메시지로 보여 줍니다.
 - Gemini 는 문서에 `additionalProperties` 지원이 명시되어 있지 않아 스키마에서 빼고 보내고, 응답은 디코딩으로 검사합니다.
 - 오류 안내: 키 없음·잘못된 키(401)·**결제 필요(402: 계정 결제·크레딧 없음, 또는 모델이 지금 요금제에 없음)**·권한(403)·모델 없음(404)·요청 과다/한도(429)·서버 오류(5xx)·거절·길이 초과. 서버가 보낸 설명은 항상 "서버 메시지" 로 덧붙이고(Google 의 `[{"error": …}]` 배열, JSON 이 아닌 응답 포함), 오류 화면에서 바로 AI 설정을 열 수 있습니다.
 
 ## 오픈소스 배포 고려
 
-- 사용자가 각자 API 키를 넣는 방식(BYOK)이며 키는 키체인(서비스 `kr.weare.myterminal.ai`, 계정 `anthropic-api-key` / `openai-api-key` / `gemini-api-key`)에 저장합니다. 요청 비용은 키의 계정에 청구됩니다.
+- 사용자가 각자 API 키를 넣는 방식(BYOK)이며 키는 키체인(서비스 `kr.weare.myterminal.ai`, 계정 `anthropic-api-key` / `openai-api-key` / `gemini-api-key` / `exaone-api-key`)에 저장합니다. 요청 비용은 키의 계정에 청구됩니다.
 - 다른 제공자나 로컬 모델은 `AIClient` 프로토콜을 구현하고 `AIProvider` 에 추가하면 붙일 수 있습니다.
 
 ## 안전장치
@@ -80,7 +82,7 @@ AI 로 터미널 작업을 돕습니다. 제공자는 **Claude · ChatGPT · Gem
 | --- | --- |
 | `Sources/App/Services/AI/AIProvider.swift` | 제공자, 모델 목록, 키체인 계정 |
 | `Sources/App/Services/AI/AIClient.swift` | 공통 요청·오류·HTTP |
-| `Sources/App/Services/AI/ClaudeClient.swift` · `OpenAIClient.swift` · `GeminiClient.swift` | 제공자별 호출 |
+| `Sources/App/Services/AI/ClaudeClient.swift` · `OpenAIClient.swift` · `GeminiClient.swift` · `ExaoneClient.swift` | 제공자별 호출 |
 | `Sources/App/Services/AI/AIPrompts.swift` | 응답 형식·스키마, 프롬프트, 위험 명령, 화면 맥락 |
 | `Sources/App/Services/AI/AIAssistant.swift` | 팔레트·패널 상태, 요청 흐름 |
 | `Sources/App/Services/AI/AISettings.swift` | 제공자·모델·확인 설정, 제공자별 API 키(키체인) |

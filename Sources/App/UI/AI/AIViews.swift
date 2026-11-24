@@ -115,11 +115,8 @@ private struct AICommandPalette: View {
             case .input:
                 quickActions
             case .loading:
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("\(settings.provider.shortName)가 명령을 찾는 중…").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
-                }
-                .padding(.vertical, 6)
+                AIWaitingRow(provider: settings.provider, waiting: palette.waiting, idleText: "명령을 찾는 중…")
+                    .padding(.vertical, 6)
             case .results(_, let suggestions):
                 if suggestions.commands.isEmpty {
                     Text(suggestions.note.isEmpty ? "추천할 명령이 없습니다." : suggestions.note)
@@ -279,6 +276,40 @@ private struct RiskBadge: View {
     }
 }
 
+/// 답을 기다리는 줄: 단계(생각 중·답 쓰는 중)와 경과 시간
+private struct AIWaitingRow: View {
+    let provider: AIProvider
+    let waiting: AIWaiting?
+    /// 단계를 모를 때 문구 ("명령을 찾는 중…")
+    let idleText: String
+
+    private var text: String {
+        switch waiting?.progress {
+        case .thinking: "\(provider.subject) 생각하는 중…"
+        case .answering: "\(provider.subject) 답을 쓰는 중…"
+        case nil: "\(provider.subject) \(idleText)"
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text(text).font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
+            if let started = waiting?.started {
+                TimelineView(.periodic(from: started, by: 1)) { context in
+                    let seconds = max(0, Int(context.date.timeIntervalSince(started)))
+                    HStack(spacing: 6) {
+                        Text("\(seconds)초").monospacedDigit()
+                        if seconds >= 15 { Text("· 생각이 길면 1분 넘게 걸릴 수 있습니다") }
+                    }
+                    .font(.system(size: 11))
+                    .foregroundStyle(Theme.textTertiary)
+                }
+            }
+        }
+    }
+}
+
 /// 지금 쓰는 AI 제공자 표시 (마우스를 올리면 모델 이름)
 private struct ProviderChip: View {
     let provider: AIProvider
@@ -377,10 +408,7 @@ private struct AIResultPanel: View {
         case .preview:
             preview
         case .loading:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text("\(settings.provider.shortName)가 살펴보는 중…").font(.system(size: 12)).foregroundStyle(Theme.textSecondary)
-            }
+            AIWaitingRow(provider: settings.provider, waiting: panel.waiting, idleText: "살펴보는 중…")
         case .answer(let answer):
             answerView(answer)
         case .failed(let message):

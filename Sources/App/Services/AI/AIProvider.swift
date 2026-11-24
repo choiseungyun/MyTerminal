@@ -5,6 +5,7 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable {
     case anthropic
     case openai
     case gemini
+    case exaone
 
     var id: String { rawValue }
 
@@ -14,6 +15,7 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable {
         case .anthropic: "Claude (Anthropic)"
         case .openai: "ChatGPT (OpenAI)"
         case .gemini: "Gemini (Google)"
+        case .exaone: "EXAONE (LG AI연구원)"
         }
     }
 
@@ -23,6 +25,15 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable {
         case .anthropic: "Claude"
         case .openai: "ChatGPT"
         case .gemini: "Gemini"
+        case .exaone: "EXAONE"
+        }
+    }
+
+    /// 주격 조사를 붙인 이름 ("Claude가", "EXAONE이"): 엑사원은 받침이 있다
+    var subject: String {
+        switch self {
+        case .exaone: shortName + "이"
+        default: shortName + "가"
         }
     }
 
@@ -32,6 +43,7 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable {
         case .anthropic: "console.anthropic.com"
         case .openai: "platform.openai.com"
         case .gemini: "aistudio.google.com"
+        case .exaone: "docs.exaone.ai"
         }
     }
 
@@ -41,6 +53,7 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable {
         case .anthropic: "console.anthropic.com 의 Billing 에서 크레딧을 확인해 주세요."
         case .openai: "platform.openai.com 의 Billing 에서 결제 수단·크레딧을 확인해 주세요."
         case .gemini: "aistudio.google.com 에서 이 키 프로젝트의 결제(Billing)·요금제를 확인해 주세요."
+        case .exaone: "docs.exaone.ai 에 로그인해 이 키의 사용 한도를 확인해 주세요 (My Profile 에서 하루 한도를 늘리는 선택 동의가 있습니다)."
         }
     }
 
@@ -49,6 +62,7 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable {
         case .anthropic: "sk-ant-…"
         case .openai: "sk-…"
         case .gemini: "AIza…"
+        case .exaone: "EXAONE API 키"
         }
     }
 
@@ -69,6 +83,8 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable {
              ("gemini-4-argon", "Gemini 4 Argon (균형)"),
              ("gemini-3.8-flash", "Gemini 3.8 Flash (빠름)"),
              ("gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite (가장 저렴)")]
+        case .exaone:
+            [("k-exaone_v2.5", "K-EXAONE 2.5 (한국어 특화)")]
         }
     }
 
@@ -82,6 +98,7 @@ enum AIProvider: String, CaseIterable, Identifiable, Codable {
         case .anthropic: "anthropic-api-key"
         case .openai: "openai-api-key"
         case .gemini: "gemini-api-key"
+        case .exaone: "exaone-api-key"
         }
     }
 }

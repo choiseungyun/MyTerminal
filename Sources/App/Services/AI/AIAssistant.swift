@@ -19,6 +19,7 @@ final class AIAssistant: ObservableObject {
         case .anthropic: ClaudeClient(session: session, apiKey: apiKey)
         case .openai: OpenAIClient(session: session, apiKey: apiKey)
         case .gemini: GeminiClient(session: session, apiKey: apiKey)
+        case .exaone: ExaoneClient(session: session, apiKey: apiKey)
         }
     }
 
@@ -35,6 +36,8 @@ final class AIAssistant: ObservableObject {
         /// 팔레트를 열 때 화면에서 선택되어 있던 글자 ("선택한 내용 설명" 항목용)
         let selection: String?
         var phase: PalettePhase = .input
+        /// 답을 기다리는 동안의 경과 시간·단계
+        var waiting: AIWaiting?
     }
 
     enum PalettePhase: Equatable {
@@ -64,11 +67,18 @@ final class AIAssistant: ObservableObject {
         guard !trimmed.isEmpty else { return }
 
         let prompt = AIPrompts.suggest(query: SecretRedactor.redact(trimmed).text, context: current.context)
-        let request = AIRequest(
+        var request = AIRequest(
             model: settings.suggestModel, system: prompt.system, user: prompt.user,
             schema: AIPrompts.suggestionsSchema, effort: "low", maxTokens: 8000)
+        request.onProgress = { [weak self] progress in
+            DispatchQueue.main.async {
+                guard let self, self.palette?.id == current.id, self.palette?.waiting != nil else { return }
+                self.palette?.waiting?.progress = progress
+            }
+        }
 
         palette?.phase = .loading(query: trimmed)
+        palette?.waiting = AIWaiting()
         paletteTask?.cancel()
         let client = makeClient(settings.provider)
         paletteTask = Task { [weak self] in
@@ -83,6 +93,7 @@ final class AIAssistant: ObservableObject {
             await MainActor.run {
                 guard let self, self.palette?.id == current.id else { return }
                 self.palette?.phase = phase
+                self.palette?.waiting = nil
             }
         }
     }
@@ -106,6 +117,8 @@ final class AIAssistant: ObservableObject {
         let maskedCount: Int
         let request: AIRequest
         var phase: PanelPhase
+        /// 답을 기다리는 동안의 경과 시간·단계
+        var waiting: AIWaiting?
     }
 
     enum PanelPhase: Equatable {
@@ -166,10 +179,17 @@ final class AIAssistant: ObservableObject {
     func send() {
         guard let current = panel else { return }
         panel?.phase = .loading
+        panel?.waiting = AIWaiting()
         panelTask?.cancel()
         // 미리 보기 뒤에 설정에서 제공자를 바꿨을 수 있으므로 보낼 때의 제공자·모델을 쓴다
         var request = current.request
         request.model = settings.model
+        request.onProgress = { [weak self] progress in
+            DispatchQueue.main.async {
+                guard let self, self.panel?.id == current.id, self.panel?.waiting != nil else { return }
+                self.panel?.waiting?.progress = progress
+            }
+        }
         let client = makeClient(settings.provider)
         panelTask = Task { [weak self] in
             let phase: PanelPhase
@@ -183,6 +203,7 @@ final class AIAssistant: ObservableObject {
             await MainActor.run {
                 guard let self, self.panel?.id == current.id else { return }
                 self.panel?.phase = phase
+                self.panel?.waiting = nil
             }
         }
     }

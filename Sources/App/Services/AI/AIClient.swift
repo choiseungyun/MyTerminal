@@ -11,6 +11,22 @@ struct AIRequest {
     var effort: String = "medium"
     /// 생각 토큰을 포함한 최대 출력 길이
     var maxTokens: Int = 16000
+    /// 진행 상황 알림 (스트리밍으로 받는 제공자만 부른다. 백그라운드에서 불릴 수 있다)
+    var onProgress: ((AIProgress) -> Void)?
+}
+
+/// 응답을 받는 중의 단계 (스트리밍 제공자)
+enum AIProgress: Equatable {
+    /// 답하기 전에 생각하는 중
+    case thinking
+    /// 답을 쓰는 중
+    case answering
+}
+
+/// 요청을 보낸 뒤 답을 기다리는 동안의 상태 (화면에 경과 시간·단계 표시)
+struct AIWaiting {
+    let started = Date()
+    var progress: AIProgress?
 }
 
 /// AI 제공자 클라이언트. 요청을 보내고 스키마에 맞는 JSON 을 `T` 로 돌려준다.
@@ -49,14 +65,14 @@ extension AIError {
     static func httpDescription(_ provider: AIProvider, status: Int, message: String?) -> String {
         let name = provider.shortName
         let guide: String = switch status {
-        case 400: "\(name)가 요청을 받아들이지 않았습니다 (400). 고른 모델이 이 기능을 지원하지 않을 수 있습니다. 설정 > AI 에서 다른 모델로 바꿔 보세요."
+        case 400: "\(provider.subject) 요청을 받아들이지 않았습니다 (400). 고른 모델이 이 기능을 지원하지 않을 수 있습니다. 설정 > AI 에서 다른 모델로 바꿔 보세요."
         case 401: "\(name) API 키가 올바르지 않습니다 (401). 설정(⌘,) > AI 에서 키를 다시 넣어 주세요."
         case 402: "\(name) 결제가 필요합니다 (402). 이 API 키 계정에 결제 수단·크레딧이 없거나, 고른 모델이 지금 요금제에서 열려 있지 않습니다. \(provider.billingHint) 설정 > AI 에서 다른 모델로 바꿔 시도할 수도 있습니다."
         case 403: "이 \(name) API 키로는 요청할 권한이 없습니다 (403). 키의 권한·프로젝트 설정을 확인해 주세요."
         case 404: "\(name) 에서 모델을 찾을 수 없습니다 (404). 설정 > AI 에서 모델을 확인해 주세요."
         case 429: "\(name) 요청이 너무 많거나 사용 한도를 넘었습니다 (429). 잠시 후 다시 시도하거나 \(provider.billingHint)"
         case 500...599: "\(name) 서버가 일시적으로 응답하지 않습니다 (\(status)). 잠시 후 다시 시도해 주세요."
-        case 0: "\(name)가 요청을 처리하지 못했습니다."
+        case 0: "\(provider.subject) 요청을 처리하지 못했습니다."
         default: "\(name) 요청 실패 (\(status))."
         }
         // 서버가 보낸 설명을 그대로 붙인다 (원인을 좁히는 데 필요)
@@ -65,7 +81,7 @@ extension AIError {
     }
 }
 
-/// 세 제공자가 같이 쓰는 HTTP 처리
+/// 제공자들이 같이 쓰는 HTTP 처리
 enum AIHTTP {
     static func key(_ apiKey: () -> String?, _ provider: AIProvider) throws -> String {
         guard let key = apiKey()?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty else {
@@ -99,6 +115,40 @@ enum AIHTTP {
         return data
     }
 
+    /// JSON 을 POST 하고 200 응답을 줄 단위로 읽는다 (SSE 스트리밍).
+    /// 조각이 계속 오므로 생각이 길어도 `timeoutInterval`(마지막 데이터 뒤 기다리는 시간)에 걸리지 않는다.
+    static func stream(_ provider: AIProvider, _ url: URL, headers: [String: String], body: [String: Any], session: URLSession) async throws -> AsyncLineSequence<URLSession.AsyncBytes> {
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 120
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "accept")
+        headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let bytes: URLSession.AsyncBytes
+        let response: URLResponse
+        do {
+            (bytes, response) = try await session.bytes(for: request)
+        } catch {
+            throw mapTransport(error)
+        }
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        guard status == 200 else {
+            var data = Data()
+            do { for try await byte in bytes { data.append(byte) } } catch { throw mapTransport(error) }
+            throw AIError.http(provider, status: status, message: errorMessage(data))
+        }
+        return bytes.lines
+    }
+
+    /// URLSession 오류 → 취소 / 네트워크 오류
+    static func mapTransport(_ error: Error) -> Error {
+        if error is CancellationError { return CancellationError() }
+        if let error = error as? URLError, error.code == .cancelled { return CancellationError() }
+        return AIError.network(error.localizedDescription)
+    }
+
     /// 오류 응답에서 설명을 꺼낸다.
     /// 보통 {"error": {"message": ...}} 이지만 Google 은 [{"error": ...}] 배열로 보내기도 하고,
     /// 프록시·게이트웨이 오류는 JSON 이 아닐 수 있어 글자 그대로 일부를 돌려준다.
@@ -111,6 +161,8 @@ enum AIHTTP {
             }
             if let error = dict?["error"] as? String, !error.isEmpty { return error }
             if let message = dict?["message"] as? String, !message.isEmpty { return message }
+            // EXAONE: {"result_code": 401, "description": "..."}
+            if let description = dict?["description"] as? String, !description.isEmpty { return description }
         }
         let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? nil : String(text.prefix(300))

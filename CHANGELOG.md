@@ -2,6 +2,12 @@
 
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 를 따르고, 버전은 [Semantic Versioning](https://semver.org/lang/ko/) 을 따릅니다.
 
+## [Unreleased]
+
+### 추가
+
+- **AI 제공자에 LG EXAONE 추가**: 설정 > AI 에서 "EXAONE (LG AI연구원)" 을 고르고 [EXAONE API](https://docs.exaone.ai) 키를 넣으면 한국어에 강한 K-EXAONE 2.5 로 명령 추천·설명·접속 진단을 쓸 수 있습니다.
+
 ## [0.1.3] - 2026-11-21
 
 ### 추가

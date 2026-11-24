@@ -390,6 +390,124 @@ final class OtherProviderClientTests: XCTestCase {
     }
 }
 
+// MARK: - EXAONE
+
+final class ExaoneClientTests: XCTestCase {
+    override func tearDown() {
+        StubURLProtocol.reset()
+        super.tearDown()
+    }
+
+    private func request(_ model: String = "k-exaone_v2.5", effort: String = "low") -> AIRequest {
+        AIRequest(model: model, system: "sys", user: "질문", schema: AIPrompts.suggestionsSchema, effort: effort, maxTokens: 8000)
+    }
+
+    /// SSE 응답: 생각 조각 → 답을 두 조각으로 → finish_reason → [DONE]
+    private func completion(_ content: String, finish: String = "stop") -> Data {
+        func event(_ object: [String: Any]) -> String {
+            "data: " + String(decoding: try! JSONSerialization.data(withJSONObject: object), as: UTF8.self) + "\n\n"
+        }
+        func delta(_ d: [String: Any]) -> String { event(["choices": [["index": 0, "delta": d]]]) }
+        let half = content.index(content.startIndex, offsetBy: content.count / 2)
+        var text = delta(["role": "assistant", "content": ""])
+        text += delta(["reasoning_content": "생각 {\"x\":1}"])
+        text += delta(["content": String(content[..<half])])
+        text += delta(["content": String(content[half...])])
+        text += event(["choices": [["index": 0, "delta": [:], "finish_reason": finish]]])
+        text += event(["choices": [], "usage": ["completion_tokens": 10]])
+        text += "data: [DONE]\n\n"
+        return Data(text.utf8)
+    }
+
+    private var client: ExaoneClient { ExaoneClient(session: StubURLProtocol.session, apiKey: { "ex-test" }) }
+
+    func testRequestShapeAndDecoding() async throws {
+        StubURLProtocol.stub = .init(body: completion("\n\n" + #"{"commands":[{"command":"df -h","explanation":"디스크","risk":"low"}],"note":""}"#))
+        let result = try await client.send(request(), as: AISuggestions.self)
+        XCTAssertEqual(result.commands.first?.command, "df -h", "생각(reasoning_content)은 건너뛰고 앞 빈 줄은 무시")
+
+        let sent = try XCTUnwrap(StubURLProtocol.lastRequest)
+        XCTAssertEqual(sent.url?.absoluteString, "https://api.exaone.ai/v1/chat/completions")
+        XCTAssertEqual(sent.value(forHTTPHeaderField: "authorization"), "Bearer ex-test")
+        let body = try XCTUnwrap(StubURLProtocol.lastBody)
+        XCTAssertEqual(body["model"] as? String, "k-exaone_v2.5")
+        XCTAssertEqual(body["max_tokens"] as? Int, 8000)
+        XCTAssertEqual(body["stream"] as? Bool, true, "생각이 길어 스트리밍으로 받는다")
+        XCTAssertEqual(body["reasoning_effort"] as? String, "low")
+        let messages = try XCTUnwrap(body["messages"] as? [[String: Any]])
+        XCTAssertEqual(messages.map { $0["role"] as? String }, ["system", "user"])
+        XCTAssertTrue((messages[0]["content"] as? String)?.hasPrefix("sys") == true)
+        XCTAssertTrue((messages[0]["content"] as? String)?.contains("\"commands\"") == true, "스키마를 시스템 프롬프트에도 넣는다")
+        XCTAssertEqual(messages[1]["content"] as? String, "질문")
+        let format = try XCTUnwrap(body["response_format"] as? [String: Any])
+        XCTAssertEqual(format["type"] as? String, "json_schema")
+        XCTAssertNotNil((format["json_schema"] as? [String: Any])?["schema"])
+    }
+
+    func testEffortMapping() {
+        XCTAssertEqual(ExaoneClient.body(for: request(effort: "medium"))["reasoning_effort"] as? String, "high")
+        XCTAssertNil(ExaoneClient.body(for: request("exaone-custom"))["reasoning_effort"], "직접 입력한 모델은 보내지 않는다")
+    }
+
+    func testExtractsJSONFromCodeFence() async throws {
+        StubURLProtocol.stub = .init(body: completion("다음과 같습니다.\n```json\n" + #"{"commands":[],"note":"없음"}"# + "\n```"))
+        let result = try await client.send(request(), as: AISuggestions.self)
+        XCTAssertEqual(result.note, "없음")
+    }
+
+    func testStopsAndErrors() async {
+        StubURLProtocol.stub = .init(body: completion(#"{"commands":["#, finish: "length"))
+        do { _ = try await client.send(request(), as: AISuggestions.self); XCTFail() } catch {
+            XCTAssertEqual(error as? AIError, .truncated)
+        }
+        StubURLProtocol.stub = .init(body: completion("", finish: "content_filter"))
+        do { _ = try await client.send(request(), as: AISuggestions.self); XCTFail() } catch {
+            XCTAssertEqual(error as? AIError, .refused)
+        }
+        StubURLProtocol.stub = .init(body: completion("JSON 이 아닌 답"))
+        do { _ = try await client.send(request(), as: AISuggestions.self); XCTFail() } catch {
+            XCTAssertEqual(error as? AIError, .badResponse)
+        }
+        StubURLProtocol.stub = .init(status: 401, body: Data(#"{"result_code":401,"description":"Invalid API key"}"#.utf8))
+        do { _ = try await client.send(request(), as: AISuggestions.self); XCTFail() } catch {
+            XCTAssertEqual(error as? AIError, .http(.exaone, status: 401, message: "Invalid API key"))
+            XCTAssertTrue(error.localizedDescription.hasPrefix("EXAONE API 키가 올바르지 않습니다"), error.localizedDescription)
+        }
+        do { _ = try await ExaoneClient(session: StubURLProtocol.session, apiKey: { nil }).send(request(), as: AISuggestions.self); XCTFail() } catch {
+            XCTAssertEqual(error as? AIError, .missingAPIKey(.exaone))
+        }
+    }
+
+    func testReportsProgressOnce() async throws {
+        StubURLProtocol.stub = .init(body: completion(#"{"commands":[],"note":"없음"}"#))
+        final class Box { var values: [AIProgress] = [] }
+        let box = Box()
+        var request = request()
+        request.onProgress = { box.values.append($0) }
+        _ = try await client.send(request, as: AISuggestions.self)
+        XCTAssertEqual(box.values, [.thinking, .answering], "단계가 바뀔 때만 알린다")
+    }
+
+    func testStreamErrorAndMissingDone() throws {
+        var stream = ExaoneClient.Stream()
+        XCTAssertThrowsError(try stream.read(#"data: {"error":{"message":"overloaded"}}"#)) {
+            XCTAssertEqual($0 as? AIError, .http(.exaone, status: 0, message: "overloaded"))
+        }
+        // [DONE] 없이 연결이 끝나도 모은 답을 읽는다. 빈 줄·다른 줄은 건너뛴다.
+        var ok = ExaoneClient.Stream()
+        XCTAssertFalse(try ok.read(""))
+        XCTAssertFalse(try ok.read(": keep-alive"))
+        XCTAssertFalse(try ok.read(#"data: {"choices":[{"delta":{"content":"{\"commands\":[],\"note\":\"a\"}"}}]}"#))
+        XCTAssertEqual(try ok.finish(as: AISuggestions.self).note, "a")
+    }
+
+    func testSubjectParticle() {
+        XCTAssertEqual(AIProvider.exaone.subject, "EXAONE이")
+        XCTAssertEqual(AIProvider.anthropic.subject, "Claude가")
+        XCTAssertTrue(AIError.http(.exaone, status: 400, message: nil).localizedDescription.hasPrefix("EXAONE이 요청을"))
+    }
+}
+
 final class AISettingsTests: XCTestCase {
     private var defaults: UserDefaults!
 
@@ -441,7 +559,7 @@ final class AISettingsTests: XCTestCase {
             XCTAssertEqual(Set(provider.presets.map(\.id)).count, provider.presets.count)
             XCTAssertTrue(provider.isPreset(provider.defaultModel))
         }
-        XCTAssertEqual(Set(AIProvider.allCases.map(\.keychainAccount)).count, 3)
+        XCTAssertEqual(Set(AIProvider.allCases.map(\.keychainAccount)).count, AIProvider.allCases.count)
     }
 }
 
