@@ -186,7 +186,14 @@ final class TerminalSurfaceView: NSView, NSTextInputClient {
         viewDidChangeBackingProperties()
     }
 
-    private func updateSurfaceSize() {
+    /// 창 크기를 끌어 바꾸는 동안 빠진 갱신이 있어도 끝날 때 한 번 더 맞춘다.
+    override func viewDidEndLiveResize() {
+        super.viewDidEndLiveResize()
+        updateSurfaceSize()
+    }
+
+    /// 지금 뷰 크기를 Ghostty 에 알린다. 크기가 같으면 Ghostty 가 바로 무시하므로 여러 번 불러도 된다.
+    func updateSurfaceSize() {
         guard let surface, frame.width > 0, frame.height > 0 else { return }
         let size = convertToBacking(frame.size)
         ghostty_surface_set_size(surface, UInt32(size.width), UInt32(size.height))

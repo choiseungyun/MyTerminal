@@ -212,7 +212,11 @@ private struct PaneView: View {
                     tab.focusedPaneID = pane.id
                 }
             }
-            TerminalSurface(view: pane.view, isFocused: isFocused)
+            // 창 크기를 바꿀 때 SwiftUI 가 NSView 프레임 갱신을 늦추거나 빠뜨리면 터미널이 옛 크기로 남아
+            // 아래가 잘린다. 그래서 GeometryReader 가 잰 크기를 직접 넘겨 컨테이너가 맞추게 한다 (Ghostty 원본과 같은 방식).
+            GeometryReader { geo in
+                TerminalSurface(view: pane.view, isFocused: isFocused, size: geo.size)
+            }
                 .overlay(
                     Theme.inactivePaneOverlay
                         .opacity(isFocused || !isSplit ? 0 : 1)
@@ -368,6 +372,8 @@ private struct StatusBar: View {
 struct TerminalSurface: NSViewRepresentable {
     let view: TerminalSurfaceView
     let isFocused: Bool
+    /// SwiftUI 가 이 칸에 준 크기 (GeometryReader 로 잰 값)
+    let size: CGSize
 
     func makeNSView(context: Context) -> TerminalSurfaceHost {
         let host = TerminalSurfaceHost(surfaceView: view)
@@ -382,6 +388,9 @@ struct TerminalSurface: NSViewRepresentable {
         if view.host == nil { view.host = host }
         host.wantsFocus = isFocused
         host.attachIfOwner()
+        // 프레임이 SwiftUI 가 잰 크기와 어긋나 있으면 다시 배치하게 한다.
+        if host.bounds.size != size { host.needsLayout = true }
+        host.syncSurface()
     }
 
     static func dismantleNSView(_ host: TerminalSurfaceHost, coordinator: ()) {
@@ -421,7 +430,20 @@ final class TerminalSurfaceHost: NSView {
 
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
-        if surfaceView.superview === self { surfaceView.frame = bounds }
+        syncSurface()
+    }
+
+    override func layout() {
+        super.layout()
+        syncSurface()
+    }
+
+    /// 터미널 화면을 컨테이너 크기에 꽉 맞추고, 그 크기를 Ghostty 에도 다시 알린다.
+    /// (프레임이 그대로여도 Ghostty 쪽 크기가 어긋나 있으면 바로잡힌다)
+    func syncSurface() {
+        guard surfaceView.superview === self else { return }
+        if surfaceView.frame != bounds { surfaceView.frame = bounds }
+        surfaceView.updateSurfaceSize()
     }
 
     /// 화면에 붙은 뒤 키 입력 포커스를 준다.
