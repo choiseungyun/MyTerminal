@@ -55,7 +55,8 @@ struct ExaoneClient: AIClient {
         let key = try AIHTTP.key(apiKey, provider)
         let lines = try await AIHTTP.stream(
             provider, Self.endpoint, headers: ["authorization": "Bearer \(key)"],
-            body: Self.body(for: request), session: session)
+            body: Self.body(for: request), session: session,
+            onRetry: { request.onProgress?(.retrying($0)) })
         var stream = Stream(onProgress: request.onProgress)
         do {
             for try await line in lines {

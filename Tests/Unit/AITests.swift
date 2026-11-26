@@ -12,12 +12,15 @@ final class StubURLProtocol: URLProtocol {
         var body: Data
     }
     static var stub: Stub?
+    /// 차례로 돌려줄 응답 (비면 stub)
+    static var queue: [Stub] = []
     static var lastRequest: URLRequest?
     static var lastBody: [String: Any]?
     static var requestCount = 0
 
     static func reset() {
         stub = nil
+        queue = []
         lastRequest = nil
         lastBody = nil
         requestCount = 0
@@ -43,7 +46,7 @@ final class StubURLProtocol: URLProtocol {
         } else if let body = request.httpBody {
             Self.lastBody = try? JSONSerialization.jsonObject(with: body) as? [String: Any]
         }
-        let stub = Self.stub ?? Stub(status: 500, body: Data())
+        let stub = Self.queue.isEmpty ? (Self.stub ?? Stub(status: 500, body: Data())) : Self.queue.removeFirst()
         let response = HTTPURLResponse(url: request.url!, statusCode: stub.status, httpVersion: nil, headerFields: nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: stub.body)
@@ -815,5 +818,78 @@ final class AIWorkspaceTests: XCTestCase {
         }
         spin(until: { pane.lastFailedExitCode != nil }, timeout: 5)
         XCTAssertEqual(pane.lastFailedExitCode, 1, "false 의 종료 코드")
+    }
+}
+
+// MARK: - 서버가 바쁠 때 (2026-11-26, 실제 iPad: EXAONE "service is busy, too many concurrent requests(600)" 을 한도 초과로 안내)
+
+final class AIBusyServerTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        AIHTTP.busyRetryDelays = [0.01, 0.01]
+    }
+
+    override func tearDown() {
+        AIHTTP.busyRetryDelays = [2, 5]
+        StubURLProtocol.reset()
+        super.tearDown()
+    }
+
+    private func request() -> AIRequest {
+        AIRequest(model: "m", system: "sys", user: "질문", schema: AIPrompts.suggestionsSchema)
+    }
+
+    /// 바쁘면 잠깐 뒤 다시 보내고, 다시 보내는 중임을 알린다
+    func testBusyServerIsRetriedThenSucceeds() async throws {
+        StubURLProtocol.queue = [
+            .init(status: 529, body: Data(#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#.utf8)),
+            .init(body: StubURLProtocol.messageBody(json: #"{"commands":[],"note":"됨"}"#)),
+        ]
+        final class Box { var values: [AIProgress] = [] }
+        let box = Box()
+        var request = request()
+        request.onProgress = { box.values.append($0) }
+        let result = try await ClaudeClient(session: StubURLProtocol.session, apiKey: { "k" }).send(request, as: AISuggestions.self)
+        XCTAssertEqual(result.note, "됨")
+        XCTAssertEqual(StubURLProtocol.requestCount, 2)
+        XCTAssertEqual(box.values, [.retrying(1)])
+    }
+
+    /// 사용자 화면 그대로: EXAONE 이 계속 바쁘면 두 번 더 보낸 뒤, 한도가 아니라 서버가 바쁘다고 안내
+    func testExaoneBusyIsNotReportedAsQuota() async {
+        let busy = StubURLProtocol.Stub(status: 429, body: Data(#"{"result_code":429,"description":"service is busy, too many concurrent requests(600)"}"#.utf8))
+        StubURLProtocol.queue = [busy, busy, busy]
+        do {
+            _ = try await ExaoneClient(session: StubURLProtocol.session, apiKey: { "k" }).send(request(), as: AISuggestions.self)
+            XCTFail("실패해야 함")
+        } catch {
+            let text = error.localizedDescription
+            XCTAssertEqual(StubURLProtocol.requestCount, 3, "처음 + 두 번 다시")
+            XCTAssertTrue(text.contains("서버가 지금 바빠"), text)
+            XCTAssertTrue(text.contains("사용 한도와는 관계없습니다"), text)
+            XCTAssertFalse(text.contains("사용 한도를 넘었습니다"), text)
+            XCTAssertTrue(text.contains("service is busy"), "서버 메시지는 그대로 붙인다")
+        }
+    }
+
+    /// 진짜 한도 초과는 다시 보내도 같으므로 바로 알린다 (예전 안내 그대로)
+    func testQuotaLimitIsNotRetried() async {
+        StubURLProtocol.stub = .init(status: 429, body: Data(#"{"error":{"message":"You exceeded your current quota"}}"#.utf8))
+        do {
+            _ = try await OpenAIClient(session: StubURLProtocol.session, apiKey: { "k" }).send(request(), as: AISuggestions.self)
+            XCTFail("실패해야 함")
+        } catch {
+            XCTAssertEqual(StubURLProtocol.requestCount, 1)
+            XCTAssertTrue(error.localizedDescription.contains("사용 한도를 넘었습니다"), error.localizedDescription)
+        }
+    }
+
+    func testBusyDetection() {
+        XCTAssertTrue(AIHTTP.isBusy(status: 503, message: nil))
+        XCTAssertTrue(AIHTTP.isBusy(status: 529, message: "Overloaded"))
+        XCTAssertTrue(AIHTTP.isBusy(status: 429, message: "service is busy, too many concurrent requests(600)"))
+        XCTAssertFalse(AIHTTP.isBusy(status: 429, message: "Rate limit exceeded: quota"))
+        XCTAssertFalse(AIHTTP.isBusy(status: 429, message: nil))
+        XCTAssertFalse(AIHTTP.isBusy(status: 500, message: "busy"))
     }
 }

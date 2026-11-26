@@ -30,7 +30,8 @@ struct ClaudeClient: AIClient {
         let data = try await AIHTTP.post(
             provider, Self.endpoint,
             headers: ["x-api-key": key, "anthropic-version": Self.apiVersion],
-            body: Self.body(for: request), session: session)
+            body: Self.body(for: request), session: session,
+            onRetry: { request.onProgress?(.retrying($0)) })
         return try Self.decode(data, as: type)
     }
 

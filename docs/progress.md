@@ -257,6 +257,7 @@
 
 | 날짜 | 단계 | 내용 |
 | --- | --- | --- |
+| 2026-11-26 | 수정 | AI 제공자 서버가 바쁠 때(429 + busy·concurrent 등, 503, 529) 한도 초과로 안내하던 문제: 잠깐 뒤 두 번까지 다시 보내고, 그래도 안 되면 "서버가 바쁨 · 한도와 관계없음" 안내. 진짜 한도 초과(429 quota)는 다시 보내지 않음. iPad 판(MyTerminalForTab) 사용자 확인 중 발견, 같은 코드라 함께 고침. 브랜치 `fix/ai-busy-retry`, 테스트 215개(새 4개) 통과, 릴리스 전 |
 | 2026-11-25 | 릴리스 | **v0.1.5 릴리스 공개** (창 크기를 바꾸면 터미널 아래가 가려지던 문제 수정): 버전 0.1.5(빌드 6), 서명·공증·스테이플된 universal DMG(23.0MB), Gatekeeper `accepted (Notarized Developer ID)`, appcast.xml(빌드 6, EdDSA 서명, 변경 내용 포함) 첨부. 공개 주소 `releases/latest/download/appcast.xml` 이 0.1.5(빌드 6)를 가리키고 내려받은 DMG 체크섬 일치 확인 → 0.1.2 이상 사용자에게 자동 업데이트로 전달 |
 | 2026-11-25 | M1 | 버그 수정(사용자 스크린샷): 창 크기를 바꾸면 터미널 아래가 상태 줄 뒤로 숨음. SwiftUI 가 창 크기 변경 중 NSView 프레임 갱신을 늦추거나 빠뜨리면 터미널이 옛(더 큰) 크기로 남는 문제(Ghostty 원본도 같은 대응을 함) → 터미널 칸 크기를 GeometryReader 로 재어 넘기고, 어긋나면 컨테이너를 다시 배치(`layout()`)하며 매번 Ghostty 에 크기를 다시 알림(같은 크기면 Ghostty 가 무시). 창 끌기가 끝날 때(`viewDidEndLiveResize`)도 한 번 더 맞춤. 테스트 전체 211개 통과, 사용자 확인 완료 |
 | 2026-11-24 | 릴리스 | **v0.1.4 릴리스 공개** (AI 제공자 LG EXAONE, 답 기다리는 동안 진행 표시): 버전 0.1.4(빌드 5), 서명·공증·스테이플된 universal DMG(23.0MB), Gatekeeper `accepted (Notarized Developer ID)`, appcast.xml(빌드 5, EdDSA 서명, 변경 내용 포함) 첨부. 공개 주소 `releases/latest/download/appcast.xml` 이 0.1.4(빌드 5)를 가리키고 내려받은 DMG 체크섬 일치 확인 → 0.1.2·0.1.3 사용자에게 자동 업데이트로 전달. 릴리스·자동 업데이트 절차 문서 [release.md](release.md) 작성 |

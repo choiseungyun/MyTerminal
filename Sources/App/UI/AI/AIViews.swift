@@ -287,6 +287,7 @@ private struct AIWaitingRow: View {
         switch waiting?.progress {
         case .thinking: "\(provider.subject) 생각하는 중…"
         case .answering: "\(provider.subject) 답을 쓰는 중…"
+        case .retrying(let attempt): "\(provider.shortName) 서버가 바빠 다시 보내는 중… (\(attempt)번째)"
         case nil: "\(provider.subject) \(idleText)"
         }
     }

@@ -39,7 +39,8 @@ struct GeminiClient: AIClient {
         let key = try AIHTTP.key(apiKey, provider)
         let data = try await AIHTTP.post(
             provider, Self.endpoint, headers: ["x-goog-api-key": key, "Api-Revision": Self.apiRevision],
-            body: Self.body(for: request), session: session)
+            body: Self.body(for: request), session: session,
+            onRetry: { request.onProgress?(.retrying($0)) })
         return try Self.decode(data, as: type)
     }
 

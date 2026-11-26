@@ -38,7 +38,8 @@ struct OpenAIClient: AIClient {
         let key = try AIHTTP.key(apiKey, provider)
         let data = try await AIHTTP.post(
             provider, Self.endpoint, headers: ["authorization": "Bearer \(key)"],
-            body: Self.body(for: request), session: session)
+            body: Self.body(for: request), session: session,
+            onRetry: { request.onProgress?(.retrying($0)) })
         return try Self.decode(data, as: type)
     }
 
