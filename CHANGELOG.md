@@ -2,11 +2,11 @@
 
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 를 따르고, 버전은 [Semantic Versioning](https://semver.org/lang/ko/) 을 따릅니다.
 
-## [Unreleased]
+## [0.1.6] - 2026-11-26
 
 ### 수정
 
-- AI 제공자 서버가 바빠 요청을 받지 못했을 때(예: EXAONE "service is busy, too many concurrent requests") 몇 번 묻지 않았는데도 "사용 한도를 넘었습니다" 로 안내하던 문제. 이제 서버가 바쁘면 잠깐 기다렸다 두 번까지 다시 보내고("서버가 바빠 다시 보내는 중…"), 그래도 안 되면 내 키의 한도와 관계없이 서버가 바쁘다고 안내합니다. 진짜 사용 한도 초과는 전처럼 바로 알립니다.
+- AI 제공자 서버가 붐빌 때(예: EXAONE 의 "service is busy, too many concurrent requests") 몇 번 묻지 않았는데도 "사용 한도를 넘었습니다" 라고 안내하던 문제. 이제 서버가 붐비면 잠깐 기다렸다 두 번까지 다시 보내고("서버가 바빠 다시 보내는 중…"), 그래도 안 되면 내 키의 사용 한도와는 관계없이 서버가 바쁘다고 알려 줍니다. 진짜 사용 한도를 넘었을 때는 전처럼 바로 알립니다.
 
 ## [0.1.5] - 2026-11-25
 
