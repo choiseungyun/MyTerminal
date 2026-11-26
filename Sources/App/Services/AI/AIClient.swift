@@ -68,7 +68,7 @@ extension AIError {
         let name = provider.shortName
         let guide: String
         if AIHTTP.isBusy(status: status, message: message) {
-            guide = "\(name) 서버가 지금 바빠 요청을 받지 못했습니다 (\(status)). 여러 사람이 함께 쓰는 서비스 쪽 사정이라 내 키의 사용 한도와는 관계없습니다. 몇 번 다시 보냈지만 받지 않았습니다. 잠시 뒤 다시 시도하거나 설정 > AI 에서 다른 제공자로 바꿔 보세요."
+            guide = "\(name) 서버가 지금 바빠 요청을 받지 못했습니다 (\(status)). 여러 사람이 함께 쓰는 서비스 쪽 사정이라 내 키의 사용 한도와는 관계없습니다. 30초 남짓 여러 번 다시 보냈지만 받지 않았습니다. 잠시 뒤 다시 시도하거나 설정 > AI 에서 다른 제공자로 바꿔 보세요."
         } else {
             guide = switch status {
             case 400: "\(provider.subject) 요청을 받아들이지 않았습니다 (400). 고른 모델이 이 기능을 지원하지 않을 수 있습니다. 설정 > AI 에서 다른 모델로 바꿔 보세요."
@@ -90,8 +90,12 @@ extension AIError {
 
 /// 제공자들이 같이 쓰는 HTTP 처리
 enum AIHTTP {
-    /// 서버가 바쁠 때 다시 보내기 전에 기다리는 시간 (초). 두 번까지 다시 보낸다. 시험에서는 짧게 바꾼다
-    nonisolated(unsafe) static var busyRetryDelays: [Double] = [2, 5]
+    /// 서버가 바쁠 때 다시 보내기 전에 기다리는 시간 (초): 약 30초 동안 여덟 번까지.
+    /// EXAONE 을 재 보니(2026-11-26) 바쁠 때 거절(429)은 0.2초 만에 오고, 1.5초 간격으로 보내면 절반쯤 받아들여지며
+    /// 거절이 연달아 최대 4번(약 8초) 이어졌다. 처음의 두 번(2·5초)으로는 자주 실패했다 (iPad 사용자 확인)
+    static let defaultBusyRetryDelays: [Double] = [1, 2, 2, 3, 3, 5, 5, 8]
+    /// 시험에서는 짧게 바꾼다
+    nonisolated(unsafe) static var busyRetryDelays: [Double] = defaultBusyRetryDelays
 
     /// 제공자 서버가 바쁜지 (동시 요청 많음·과부하): 잠깐 뒤 다시 보내면 되는 경우.
     /// 429 라도 사용 한도·요금 초과면 다시 보내도 같으므로 아니다 (서버 메시지로 가린다).

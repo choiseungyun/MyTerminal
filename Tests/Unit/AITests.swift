@@ -830,7 +830,7 @@ final class AIBusyServerTests: XCTestCase {
     }
 
     override func tearDown() {
-        AIHTTP.busyRetryDelays = [2, 5]
+        AIHTTP.busyRetryDelays = AIHTTP.defaultBusyRetryDelays
         StubURLProtocol.reset()
         super.tearDown()
     }
@@ -882,6 +882,14 @@ final class AIBusyServerTests: XCTestCase {
             XCTAssertEqual(StubURLProtocol.requestCount, 1)
             XCTAssertTrue(error.localizedDescription.contains("사용 한도를 넘었습니다"), error.localizedDescription)
         }
+    }
+
+    /// 바쁠 때는 30초 남짓 여러 번 (거절이 연달아 8초쯤 이어지는 것을 견딘다)
+    func testDefaultRetryWindow() {
+        let delays = AIHTTP.defaultBusyRetryDelays
+        XCTAssertGreaterThanOrEqual(delays.count, 6)
+        XCTAssertGreaterThanOrEqual(delays.reduce(0, +), 20)
+        XCTAssertLessThanOrEqual(delays.reduce(0, +), 40)
     }
 
     func testBusyDetection() {
