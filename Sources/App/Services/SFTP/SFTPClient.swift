@@ -103,6 +103,26 @@ final class ProcessTransport: SFTPTransport {
         try process.run()
     }
 
+    /// 접속에 실패했을 때 쓰는 오류 문구: ssh 가 끝나고 남은 오류 문구가 다 들어올 때까지 잠깐(최대 timeout) 기다린다.
+    /// 오류 문구는 따로(비동기로) 읽으므로 바로 보면 아직 비어 있을 수 있다. 그러면 "호스트 이름을 찾을 수 없습니다" 대신
+    /// "연결이 끊어졌습니다" 가 보였다 (2026-11-26, GitHub CI 에서 가끔 재현).
+    /// 끝까지 읽기(EOF)는 기다리지 않는다: ControlMaster 로 남는 ssh 가 오류 통로를 계속 열어 둘 수 있다.
+    func errorTextAfterExit(timeout: TimeInterval = 1) async -> String {
+        let deadline = Date().addingTimeInterval(timeout)
+        while process.isRunning, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        // 끝난 뒤 남은 글자가 처리기로 들어올 시간: 글자가 있고 50ms 동안 더 늘지 않으면 다 들어온 것
+        var last = -1
+        while Date() < deadline {
+            let count = lock.withLock { stderrBuffer.count }
+            if count > 0, count == last { break }
+            last = count
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return errorText
+    }
+
     func terminate() {
         stderrPipe.fileHandleForReading.readabilityHandler = nil
         try? stdinPipe.fileHandleForWriting.close()

@@ -166,6 +166,18 @@ final class SFTPConnectionTests: XCTestCase {
         }
     }
 
+    /// 회귀(2026-11-26, GitHub CI 에서 가끔): 프로세스가 오류 문구를 쓰고 바로 끝나도, 실패를 판단할 때 문구가 다 들어와 있다
+    func testErrorTextIsCompleteAfterQuickExit() async throws {
+        for _ in 0..<20 {
+            let transport = try ProcessTransport(
+                executable: "/bin/sh",
+                arguments: ["-c", "echo 'ssh: Could not resolve hostname no-such-host.invalid: nodename nor servname provided' >&2; exit 255"])
+            let text = await transport.errorTextAfterExit()
+            XCTAssertTrue(text.contains("Could not resolve hostname"), "받은 문구: \(text.debugDescription)")
+            transport.terminate()
+        }
+    }
+
     func testFriendlyErrorMapping() {
         let base = SFTPError.connectionLost("")
         let cases: [(String, String)] = [

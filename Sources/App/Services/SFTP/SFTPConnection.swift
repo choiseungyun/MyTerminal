@@ -42,7 +42,7 @@ final class SFTPConnection {
             return SFTPConnection(launch: launch, client: client, askpassToken: token)
         } catch {
             if let token { AskpassServer.shared.unregister(token) }
-            throw friendlyError(error, stderr: transport.errorText)
+            throw friendlyError(error, stderr: await transport.errorTextAfterExit())
         }
     }
 

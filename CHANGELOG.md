@@ -2,6 +2,12 @@
 
 형식은 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 를 따르고, 버전은 [Semantic Versioning](https://semver.org/lang/ko/) 을 따릅니다.
 
+## [Unreleased]
+
+### 수정
+
+- SFTP 패널에서 없는 주소로 접속했을 때 가끔 "호스트 이름을 찾을 수 없습니다" 대신 "연결이 끊어졌습니다" 만 보이던 문제.
+
 ## [0.1.7] - 2026-11-26
 
 ### 수정
